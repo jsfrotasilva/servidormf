@@ -1,11 +1,12 @@
 import React, { useState } from 'react';
-import { Server, ATS, LicencaPremio, LicencaPremioUsage, LicencaTipoUso, EvolucaoFuncional } from '../types/server';
+import { Server, ATS, LicencaPremio, LicencaPremioUsage, LicencaTipoUso, EvolucaoFuncional, User as UserType } from '../types/server';
 import { Card, Button, Input, Badge } from '../components/UI';
 import { Search, Trash2, Calendar, FileText, User, ShieldCheck, History, TrendingUp } from 'lucide-react';
 import { formatDisplayDate } from '../utils/formatters';
 
 interface BenefitsProps {
   servers: Server[];
+  user: UserType;
   onUpdateServer: (serverId: string, data: Partial<Server>) => void;
 }
 
@@ -49,10 +50,13 @@ const EVOLUTION_CRITERIA: Record<string, { intersticio: string; minScore: number
   'IX para X': { intersticio: '4 anos', minScore: 60, weights: [3, 3, 4] },
 };
 
-export const Benefits: React.FC<BenefitsProps> = ({ servers, onUpdateServer }) => {
+export const Benefits: React.FC<BenefitsProps> = ({ servers, user, onUpdateServer }) => {
+  const isAdmin = user.role === 'admin';
   const [searchTerm, setSearchTerm] = useState('');
-  const [selectedServerId, setSelectedServerId] = useState<string | null>(null);
-  const selectedServer = servers.find(s => s.id === selectedServerId);
+  const [selectedServerId, setSelectedServerId] = useState<string | null>(isAdmin ? null : user.serverId || null);
+  const selectedServer = servers.find(s => s.id === (isAdmin ? selectedServerId : user.serverId));
+
+  const [requestStatus] = useState<string | null>(null);
 
   const [showAddATS, setShowAddATS] = useState(false);
   const [editingATSId, setEditingATSId] = useState<string | null>(null);
@@ -92,28 +96,21 @@ export const Benefits: React.FC<BenefitsProps> = ({ servers, onUpdateServer }) =
     inicioVigenciaProxima: ''
   });
 
-  const add1825Days = (dateString: string) => {
+  const calculateFutureDate = (dateString: string, years: number) => {
     if (!dateString) return '';
     const [year, month, day] = dateString.split('-').map(Number);
     
-    // Conforme solicitado: Contagem inclusiva, somando 5 anos (1825 dias)
-    // ignorando anos bissextos (ano fixo de 365 dias).
-    // Na prática, isso é a data de aniversário daqui a 5 anos menos 1 dia.
-    // Exemplo: 01/01/2020 -> 31/12/2024
-    
-    let targetYear = year + 5;
+    let targetYear = year + years;
     let targetMonth = month;
     let targetDay = day - 1;
 
-    // Ajuste se o dia for 1 (ex: 01/01/2020 -> 31/12/2024)
     if (targetDay === 0) {
       targetMonth = month - 1;
       if (targetMonth === 0) {
         targetMonth = 12;
-        targetYear = year + 4; // Voltamos 1 ano pois 01/01 -> 31/12 do ano anterior (mas somamos 5 anos antes, então +4)
+        targetYear = year + (years - 1);
       }
       
-      // Dias por mês (ano fixo 365 dias)
       const daysInMonth = [31, 28, 31, 30, 31, 30, 31, 31, 30, 31, 30, 31];
       targetDay = daysInMonth[targetMonth - 1];
     }
@@ -123,6 +120,22 @@ export const Benefits: React.FC<BenefitsProps> = ({ servers, onUpdateServer }) =
     const d = String(targetDay).padStart(2, '0');
     
     return `${y}-${m}-${d}`;
+  };
+
+  const add1825Days = (dateString: string) => calculateFutureDate(dateString, 5);
+
+  const getNextEvolucaoDate = (dateString: string, levelPara: string) => {
+    if (!dateString) return '';
+    const nextLevelIndex = NIVEIS.indexOf(levelPara);
+    const nextLevel = NIVEIS[nextLevelIndex + 1];
+    if (!nextLevel) return '';
+    
+    const nextKey = `${levelPara} para ${nextLevel}`;
+    const criteria = EVOLUTION_CRITERIA[nextKey];
+    if (!criteria) return '';
+    
+    const years = criteria.intersticio.includes('5') ? 5 : 4;
+    return calculateFutureDate(dateString, years);
   };
 
   const [newUsage, setNewUsage] = useState<Omit<LicencaPremioUsage, 'id'>>({
@@ -136,6 +149,11 @@ export const Benefits: React.FC<BenefitsProps> = ({ servers, onUpdateServer }) =
   });
 
   const eligibleCategories = ['A-EFETIVO', 'ACT-F'];
+  
+  // Rule: PEFM + A-EFETIVO shows only Licenses
+  const isPEFM_A_Efetivo = selectedServer?.cargo?.toUpperCase().trim() === 'PEFM' && 
+                           selectedServer?.categoria?.toUpperCase().trim() === 'A-EFETIVO';
+
   const filteredServers = servers.filter(s => {
     const matchesSearch = s.nome.toLowerCase().includes(searchTerm.toLowerCase()) || 
                          s.cpf.includes(searchTerm);
@@ -158,7 +176,6 @@ export const Benefits: React.FC<BenefitsProps> = ({ servers, onUpdateServer }) =
     if (!selectedServer) return;
     
     if (editingATSId) {
-      // Update existing
       onUpdateServer(selectedServer.id, {
         ats: (selectedServer.ats || []).map(a => 
           a.id === editingATSId ? { ...newATS, id: a.id } : a
@@ -166,7 +183,6 @@ export const Benefits: React.FC<BenefitsProps> = ({ servers, onUpdateServer }) =
       });
       setEditingATSId(null);
     } else {
-      // Create new
       const atsRecord: ATS = {
         ...newATS,
         id: Math.random().toString(36).substr(2, 9)
@@ -285,7 +301,6 @@ export const Benefits: React.FC<BenefitsProps> = ({ servers, onUpdateServer }) =
   const handleAddEvolucao = () => {
     if (!selectedServer) return;
 
-    // Buscar critérios se for a última
     const key = `${newEvolucao.nivelDe} para ${newEvolucao.nivelPara}`;
     const criteria = newEvolucao.isUltima ? EVOLUTION_CRITERIA[key] : null;
 
@@ -348,14 +363,22 @@ export const Benefits: React.FC<BenefitsProps> = ({ servers, onUpdateServer }) =
 
   return (
     <div className="space-y-6">
+      {requestStatus && (
+        <div className="fixed top-20 right-4 z-50 rounded-lg bg-green-500 px-6 py-3 text-white shadow-lg shadow-green-200">
+          {requestStatus}
+        </div>
+      )}
       <header>
-        <h1 className="text-2xl font-bold text-gray-800">Vantagens e Benefícios</h1>
-        <p className="text-gray-500 text-sm">Gestão de ATS, Sexta-Parte e Licença-Prêmio</p>
+        <h1 className="text-2xl font-bold text-gray-800">{isAdmin ? 'Vantagens e Benefícios' : 'Minhas Vantagens e Benefícios'}</h1>
+        <p className="text-gray-500 text-sm">
+          {isAdmin ? 'Gestão de ATS, Sexta-Parte e Licença-Prêmio' : 'Consulte seus blocos, certidões e próximos vencimentos'}
+        </p>
       </header>
 
       <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
         {/* Sidebar */}
-        <Card className="lg:col-span-1 flex flex-col h-[calc(100vh-250px)]">
+        {isAdmin && (
+          <Card className="lg:col-span-1 flex flex-col h-[calc(100vh-250px)]">
           <div className="p-4 border-b border-gray-100">
             <div className="relative">
               <Search className="absolute left-3 top-1/2 -translate-y-1/2 text-gray-400 w-4 h-4" />
@@ -385,121 +408,153 @@ export const Benefits: React.FC<BenefitsProps> = ({ servers, onUpdateServer }) =
             ))}
           </div>
         </Card>
+        )}
 
         {/* Content */}
-        <div className="lg:col-span-2 space-y-6 overflow-y-auto h-[calc(100vh-250px)] pr-2">
+        <div className={`${isAdmin ? 'lg:col-span-2' : 'lg:col-span-3'} space-y-6 overflow-y-auto h-[calc(100vh-250px)] pr-2`}>
           {selectedServer ? (
             <>
               {/* ATS Section */}
-              <Card className="p-6">
-                <div className="flex justify-between items-center mb-6">
-                  <h2 className="text-lg font-bold flex items-center gap-2"><Calendar className="w-5 h-5 text-blue-500" /> ATS</h2>
-                  <Button 
-                    size="sm" 
-                    onClick={() => {
-                      if (showAddATS) {
-                        setShowAddATS(false);
-                        setEditingATSId(null);
-                        setNewATS({ motivo: MOTIVOS_ATS[0], vigencia: '', dataPublicacaoDOE: '', ultimoAts: false });
-                      } else {
-                        setShowAddATS(true);
-                      }
-                    }}
-                  >
-                    {showAddATS ? 'Cancelar' : 'Adicionar ATS'}
-                  </Button>
-                </div>
-                {showAddATS && (
-                  <div className="bg-gray-50 p-4 rounded-lg mb-4 grid grid-cols-2 gap-4">
-                    <div className="col-span-2 space-y-1">
-                      <label className="text-[10px] font-bold text-gray-500 uppercase">Motivo</label>
-                      <select className="w-full p-2 border rounded text-sm bg-white" value={newATS.motivo} onChange={e => setNewATS({...newATS, motivo: e.target.value})}>
-                        {MOTIVOS_ATS.map(m => <option key={m} value={m}>{m}</option>)}
-                      </select>
-                    </div>
-                    <div className="space-y-1">
-                      <label className="text-[10px] font-bold text-gray-500 uppercase">Vigência</label>
-                      <Input type="date" value={newATS.vigencia} onChange={e => setNewATS({...newATS, vigencia: e.target.value})} />
-                    </div>
-                    <div className="space-y-1">
-                      <label className="text-[10px] font-bold text-gray-500 uppercase">Publicação em DOE</label>
-                      <Input type="date" value={newATS.dataPublicacaoDOE} onChange={e => setNewATS({...newATS, dataPublicacaoDOE: e.target.value})} />
-                    </div>
-                    
-                    <div className="col-span-2 flex items-center gap-2 py-2">
-                      <input 
-                        type="checkbox" 
-                        id="ultimoAts" 
-                        checked={newATS.ultimoAts} 
-                        onChange={e => setNewATS({...newATS, ultimoAts: e.target.checked})}
-                        className="w-4 h-4 rounded text-blue-600 focus:ring-blue-500"
-                      />
-                      <label htmlFor="ultimoAts" className="text-sm font-medium text-gray-700">Último ATS</label>
-                    </div>
-
-                    {newATS.ultimoAts && newATS.vigencia && (
-                      <div className="col-span-2 p-3 bg-blue-100 border border-blue-200 rounded-lg text-blue-800 text-xs font-bold animate-pulse">
-                        Provavelmente vencimento do próximo ATS: {formatDisplayDate(add1825Days(newATS.vigencia))}
+              {!isPEFM_A_Efetivo && (
+                <Card className="p-6">
+                  <div className="flex justify-between items-center mb-6">
+                    <h2 className="text-lg font-bold flex items-center gap-2"><Calendar className="w-5 h-5 text-blue-500" /> ATS</h2>
+                    <Button 
+                      size="sm" 
+                      onClick={() => {
+                        if (showAddATS) {
+                          setShowAddATS(false);
+                          setEditingATSId(null);
+                          setNewATS({ motivo: MOTIVOS_ATS[0], vigencia: '', dataPublicacaoDOE: '', ultimoAts: false });
+                        } else {
+                          setShowAddATS(true);
+                        }
+                      }}
+                    >
+                      {showAddATS ? 'Cancelar' : 'Adicionar ATS'}
+                    </Button>
+                  </div>
+                  {showAddATS && (
+                    <div className="bg-gray-50 p-4 rounded-lg mb-4 grid grid-cols-2 gap-4">
+                      <div className="col-span-2 space-y-1">
+                        <label className="text-[10px] font-bold text-gray-500 uppercase">Motivo</label>
+                        <select className="w-full p-2 border rounded text-sm bg-white" value={newATS.motivo} onChange={e => setNewATS({...newATS, motivo: e.target.value})}>
+                          {MOTIVOS_ATS.map(m => <option key={m} value={m}>{m}</option>)}
+                        </select>
                       </div>
+                      <div className="space-y-1">
+                        <label className="text-[10px] font-bold text-gray-500 uppercase">Vigência</label>
+                        <Input type="date" value={newATS.vigencia} onChange={e => setNewATS({...newATS, vigencia: e.target.value})} />
+                      </div>
+                      <div className="space-y-1">
+                        <label className="text-[10px] font-bold text-gray-500 uppercase">Publicação em DOE</label>
+                        <Input type="date" value={newATS.dataPublicacaoDOE} onChange={e => setNewATS({...newATS, dataPublicacaoDOE: e.target.value})} />
+                      </div>
+                      
+                      <div className="col-span-2 flex items-center gap-2 py-2">
+                        <input 
+                          type="checkbox" 
+                          id="ultimoAts" 
+                          checked={newATS.ultimoAts} 
+                          onChange={e => setNewATS({...newATS, ultimoAts: e.target.checked})}
+                          className="w-4 h-4 rounded text-blue-600 focus:ring-blue-500"
+                        />
+                        <label htmlFor="ultimoAts" className="text-sm font-medium text-gray-700">Último ATS</label>
+                      </div>
+
+                      {newATS.ultimoAts && newATS.vigencia && (
+                        <div className="col-span-2 p-3 bg-blue-100 border border-blue-200 rounded-lg text-blue-800 text-xs font-bold animate-pulse">
+                          Provavelmente vencimento do próximo ATS: {formatDisplayDate(add1825Days(newATS.vigencia))}
+                        </div>
+                      )}
+
+                      <Button onClick={handleAddATS} className="col-span-2">Salvar</Button>
+                    </div>
+                  )}
+                  <div className="space-y-2">
+                    {selectedServer.ats?.map(ats => (
+                      <div key={ats.id} className="flex justify-between items-center p-3 border rounded relative overflow-hidden">
+                        {ats.ultimoAts && <div className="absolute top-0 right-0 px-2 py-0.5 bg-blue-600 text-[8px] text-white font-bold rounded-bl uppercase">Último</div>}
+                        <div>
+                          <p className="font-bold text-sm">{ats.motivo}</p>
+                          <p className="text-xs text-gray-500">Vigência: {formatDisplayDate(ats.vigencia)} | DOE: {formatDisplayDate(ats.dataPublicacaoDOE)}</p>
+                          {ats.ultimoAts && (
+                            <p className="text-[10px] text-blue-600 font-bold mt-1 uppercase">
+                              Próximo: {formatDisplayDate(add1825Days(ats.vigencia))}
+                            </p>
+                          )}
+                        </div>
+                        <div className="flex gap-2">
+                          <button onClick={() => handleEditATS(ats)} className="text-blue-500 hover:text-blue-700 p-1"><FileText className="w-4 h-4" /></button>
+                          <button onClick={() => handleDeleteATS(ats.id)} className="text-gray-300 hover:text-red-500 p-1"><Trash2 className="w-4 h-4" /></button>
+                        </div>
+                      </div>
+                    ))}
+                    {!selectedServer.ats?.length && (
+                      <div className="text-center py-6 text-gray-400 border-2 border-dashed border-gray-100 rounded-xl">Nenhum registro de ATS.</div>
                     )}
-
-                    <Button onClick={handleAddATS} className="col-span-2">Salvar</Button>
                   </div>
-                )}
-                <div className="space-y-2">
-                  {selectedServer.ats?.map(ats => (
-                    <div key={ats.id} className="flex justify-between items-center p-3 border rounded relative overflow-hidden">
-                      {ats.ultimoAts && <div className="absolute top-0 right-0 px-2 py-0.5 bg-blue-600 text-[8px] text-white font-bold rounded-bl uppercase">Último</div>}
+                </Card>
+              )}
+
+              {/* Sexta-Parte Section */}
+              {!isPEFM_A_Efetivo && (
+                <Card className="p-6">
+                  <div className="flex justify-between items-center mb-6">
+                    <h2 className="text-lg font-bold flex items-center gap-2"><ShieldCheck className="w-5 h-5 text-purple-500" /> Sexta-Parte</h2>
+                    <div className="flex gap-2">
+                      {selectedServer.sextaParte && (
+                        <Button size="sm" variant="outline" className="text-red-600 border-red-100 hover:bg-red-50" onClick={handleDeleteSextaParte}>
+                          <Trash2 className="w-4 h-4" />
+                        </Button>
+                      )}
+                      <Button 
+                        size="sm" 
+                        className="bg-purple-600" 
+                        onClick={() => {
+                          if (showSextaParteForm) {
+                            setShowSextaParteForm(false);
+                          } else {
+                            setShowSextaParteForm(true);
+                            setNewSextaParte({
+                              vigencia: selectedServer.sextaParte?.vigencia || '',
+                              dataPublicacaoDOE: selectedServer.sextaParte?.dataPublicacaoDOE || ''
+                            });
+                          }
+                        }}
+                      >
+                        {showSextaParteForm ? 'Cancelar e Recolher' : (selectedServer.sextaParte ? 'Editar' : 'Cadastrar')}
+                      </Button>
+                    </div>
+                  </div>
+                  {showSextaParteForm && (
+                    <div className="bg-purple-50 p-4 rounded-lg mb-4 space-y-4">
+                      <div className="grid grid-cols-2 gap-4">
+                        <div className="space-y-1">
+                          <label className="text-[10px] font-bold text-gray-500 uppercase">Vigência</label>
+                          <Input type="date" value={newSextaParte.vigencia} onChange={e => setNewSextaParte({...newSextaParte, vigencia: e.target.value})} />
+                        </div>
+                        <div className="space-y-1">
+                          <label className="text-[10px] font-bold text-gray-500 uppercase">Publicação em DOE</label>
+                          <Input type="date" value={newSextaParte.dataPublicacaoDOE} onChange={e => setNewSextaParte({...newSextaParte, dataPublicacaoDOE: e.target.value})} />
+                        </div>
+                      </div>
+                      <Button onClick={handleSaveSextaParte} className="w-full bg-purple-600">Salvar Sexta-Parte</Button>
+                    </div>
+                  )}
+                  {selectedServer.sextaParte ? (
+                    <div className="p-3 border rounded bg-white shadow-sm flex justify-between items-center border-l-4 border-l-purple-500">
                       <div>
-                        <p className="font-bold text-sm">{ats.motivo}</p>
-                        <p className="text-xs text-gray-500">Vigência: {formatDisplayDate(ats.vigencia)} | DOE: {formatDisplayDate(ats.dataPublicacaoDOE)}</p>
-                        {ats.ultimoAts && (
-                          <p className="text-[10px] text-blue-600 font-bold mt-1 uppercase">
-                            Próximo: {formatDisplayDate(add1825Days(ats.vigencia))}
-                          </p>
-                        )}
+                        <p className="font-bold text-sm">6ª PARTE CONCEDIDA</p>
+                        <p className="text-xs text-gray-500">Vigência: {formatDisplayDate(selectedServer.sextaParte.vigencia)} | DOE: {formatDisplayDate(selectedServer.sextaParte.dataPublicacaoDOE)}</p>
                       </div>
-                      <div className="flex gap-2">
-                        <button onClick={() => handleEditATS(ats)} className="text-blue-500 hover:text-blue-700 p-1"><FileText className="w-4 h-4" /></button>
-                        <button onClick={() => handleDeleteATS(ats.id)} className="text-red-500 hover:text-red-700 p-1"><Trash2 className="w-4 h-4" /></button>
-                      </div>
+                      <Badge variant="info">Concedido</Badge>
                     </div>
-                  ))}
-                </div>
-              </Card>
-
-              {/* Sexta-Parte */}
-              <Card className="p-6">
-                <div className="flex justify-between items-center mb-6">
-                  <h2 className="text-lg font-bold flex items-center gap-2"><FileText className="w-5 h-5 text-purple-500" /> Sexta-Parte</h2>
-                  {!selectedServer.sextaParte && <Button size="sm" onClick={() => setShowSextaParteForm(true)}>Cadastrar</Button>}
-                </div>
-                {showSextaParteForm && (
-                  <div className="bg-gray-50 p-4 rounded-lg mb-4 grid grid-cols-2 gap-4">
-                    <div className="space-y-1">
-                      <label className="text-[10px] font-bold text-gray-500 uppercase">Vigência</label>
-                      <Input type="date" value={newSextaParte.vigencia} onChange={e => setNewSextaParte({...newSextaParte, vigencia: e.target.value})} />
-                    </div>
-                    <div className="space-y-1">
-                      <label className="text-[10px] font-bold text-gray-500 uppercase">Publicação em DOE</label>
-                      <Input type="date" value={newSextaParte.dataPublicacaoDOE} onChange={e => setNewSextaParte({...newSextaParte, dataPublicacaoDOE: e.target.value})} />
-                    </div>
-                    <div className="col-span-2 flex gap-2">
-                      <Button onClick={handleSaveSextaParte} className="flex-1">Salvar</Button>
-                      <Button variant="secondary" onClick={() => setShowSextaParteForm(false)} className="flex-1">Cancelar e Recolher</Button>
-                    </div>
-                  </div>
-                )}
-                {selectedServer.sextaParte && (
-                  <div className="flex justify-between items-center p-4 bg-purple-50 border border-purple-100 rounded-lg">
-                    <div>
-                      <p className="text-purple-900 font-bold">Vigência: {formatDisplayDate(selectedServer.sextaParte.vigencia)}</p>
-                      <p className="text-purple-700 text-sm">DOE: {formatDisplayDate(selectedServer.sextaParte.dataPublicacaoDOE)}</p>
-                    </div>
-                    <button onClick={handleDeleteSextaParte} className="text-red-500"><Trash2 className="w-4 h-4" /></button>
-                  </div>
-                )}
-              </Card>
+                  ) : (
+                    <div className="text-center py-6 text-gray-400 border-2 border-dashed border-gray-100 rounded-xl">Não cadastrado.</div>
+                  )}
+                </Card>
+              )}
 
               {/* Licença-Prêmio Section */}
               <Card className="p-6">
@@ -681,7 +736,7 @@ export const Benefits: React.FC<BenefitsProps> = ({ servers, onUpdateServer }) =
               </Card>
 
               {/* Evolução Funcional Section */}
-              {['PEB II', 'DIRETOR DE ESCOLA'].includes(selectedServer.cargo?.toUpperCase().trim()) && (
+              {!isPEFM_A_Efetivo && ['PEB II', 'DIRETOR DE ESCOLA'].includes(selectedServer.cargo?.toUpperCase().trim() || '') && (
                 <Card className="p-6">
                   <div className="flex justify-between items-center mb-6">
                     <h2 className="text-lg font-bold flex items-center gap-2"><TrendingUp className="w-5 h-5 text-blue-600" /> Evolução Funcional</h2>
@@ -786,6 +841,12 @@ export const Benefits: React.FC<BenefitsProps> = ({ servers, onUpdateServer }) =
                           ) : (
                             <p className="text-xs text-red-500 italic">Critérios não definidos para esta transição.</p>
                           )}
+
+                          {newEvolucao.vigencia && (
+                            <div className="mt-2 p-2 bg-blue-100 border border-blue-200 rounded text-blue-800 text-[10px] font-bold uppercase text-center">
+                              Previsão da Próxima Vigência: {formatDisplayDate(getNextEvolucaoDate(newEvolucao.vigencia, newEvolucao.nivelPara))}
+                            </div>
+                          )}
                         </div>
                       )}
 
@@ -796,35 +857,52 @@ export const Benefits: React.FC<BenefitsProps> = ({ servers, onUpdateServer }) =
                   )}
                   <div className="space-y-2">
                     {selectedServer.evolucoesFuncionais?.map(e => (
-                      <div key={e.id} className="flex items-center justify-between p-3 border-l-4 border-l-blue-400 bg-white border border-gray-100 rounded-r-lg shadow-sm relative overflow-hidden">
+                      <div key={e.id} className="flex flex-col p-3 border-l-4 border-l-blue-400 bg-white border border-gray-100 rounded-r-lg shadow-sm relative overflow-hidden">
                         {e.isUltima && <div className="absolute top-0 right-0 px-2 py-0.5 bg-blue-600 text-[8px] text-white font-bold rounded-bl uppercase">Última</div>}
-                        <div className="flex items-center gap-4">
-                          <div className="p-2 rounded-full bg-blue-50 text-blue-600">
-                            <TrendingUp className="w-4 h-4" />
+                        <div className="flex items-center justify-between">
+                          <div className="flex items-center gap-4">
+                            <div className="p-2 rounded-full bg-blue-50 text-blue-600">
+                              <TrendingUp className="w-4 h-4" />
+                            </div>
+                            <div>
+                              <p className="font-bold text-sm">{e.motivo}</p>
+                              <p className="text-xs text-gray-700 font-medium">De Nível {e.nivelDe} para Nível {e.nivelPara}</p>
+                              <p className="text-[10px] text-gray-500">
+                                Vigência: {formatDisplayDate(e.vigencia)} | DOE: {formatDisplayDate(e.dataPublicacaoDOE)}
+                              </p>
+                            </div>
                           </div>
-                          <div>
-                            <p className="font-bold text-sm">{e.motivo}</p>
-                            <p className="text-xs text-gray-700 font-medium">De Nível {e.nivelDe} para Nível {e.nivelPara}</p>
-                            <p className="text-[10px] text-gray-500">
-                              Vigência: {formatDisplayDate(e.vigencia)} | DOE: {formatDisplayDate(e.dataPublicacaoDOE)}
-                            </p>
-                            {e.isUltima && e.intersticio && (
-                              <div className="mt-2 grid grid-cols-4 gap-2 border-t pt-1">
-                                <span className="text-[8px] text-blue-600 font-bold uppercase">Interstício: {e.intersticio}</span>
-                                <span className="text-[8px] text-blue-600 font-bold uppercase">Min: {e.pontuacaoMinima} pts</span>
-                                <span className="text-[8px] text-blue-600 font-bold uppercase">Pesos: {e.pesoAtualizacao}/{e.pesoAperfeicoamento}/{e.pesoProducao}</span>
+                          <div className="flex gap-2">
+                            <button onClick={() => handleEditEvolucao(e)} className="text-blue-500 hover:text-blue-700 transition-colors">
+                              <FileText className="w-4 h-4" />
+                            </button>
+                            <button onClick={() => handleDeleteEvolucao(e.id)} className="text-gray-300 hover:text-red-500 transition-colors">
+                              <Trash2 className="w-4 h-4" />
+                            </button>
+                          </div>
+                        </div>
+                        {e.isUltima && e.intersticio && (
+                          <div className="mt-3 p-3 bg-blue-50 border border-blue-100 rounded-md">
+                            <div className="grid grid-cols-2 md:grid-cols-4 gap-2">
+                              <div className="text-center">
+                                <p className="text-[8px] text-gray-400 uppercase">Interstício</p>
+                                <p className="text-[10px] font-bold text-blue-800">{e.intersticio}</p>
                               </div>
-                            )}
+                              <div className="text-center">
+                                <p className="text-[8px] text-gray-400 uppercase">Min. Pontos</p>
+                                <p className="text-[10px] font-bold text-blue-800">{e.pontuacaoMinima} pts</p>
+                              </div>
+                              <div className="text-center">
+                                <p className="text-[8px] text-gray-400 uppercase">Pesos</p>
+                                <p className="text-[10px] font-bold text-blue-800">{e.pesoAtualizacao}/{e.pesoAperfeicoamento}/{e.pesoProducao}</p>
+                              </div>
+                              <div className="text-center">
+                                <p className="text-[8px] text-gray-400 uppercase">Próxima Vigência</p>
+                                <p className="text-[10px] font-bold text-blue-800">{formatDisplayDate(getNextEvolucaoDate(e.vigencia, e.nivelPara))}</p>
+                              </div>
+                            </div>
                           </div>
-                        </div>
-                        <div className="flex gap-2">
-                          <button onClick={() => handleEditEvolucao(e)} className="text-blue-500 hover:text-blue-700 transition-colors">
-                            <FileText className="w-4 h-4" />
-                          </button>
-                          <button onClick={() => handleDeleteEvolucao(e.id)} className="text-gray-300 hover:text-red-500 transition-colors">
-                            <Trash2 className="w-4 h-4" />
-                          </button>
-                        </div>
+                        )}
                       </div>
                     ))}
                     {!selectedServer.evolucoesFuncionais?.length && (

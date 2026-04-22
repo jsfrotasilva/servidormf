@@ -1,9 +1,10 @@
 
 import React from 'react';
-import { Cake, Calendar, Gift, Search } from 'lucide-react';
+import { Cake, Calendar, Search } from 'lucide-react';
 import { motion, AnimatePresence } from 'framer-motion';
 import { Card, Input, Badge } from '../components/UI';
 import { Server } from '../types/server';
+import { getAvatarUrl } from '../utils/formatters';
 
 interface BirthdaysProps {
   servers: Server[];
@@ -74,8 +75,17 @@ export const Birthdays = ({ servers }: BirthdaysProps) => {
           <div className={`p-4 ${isToday ? 'bg-gradient-to-br from-blue-50 to-indigo-50' : 'bg-white'}`}>
             <div className="flex items-start justify-between">
               <div className="flex items-center gap-3">
-                <div className={`h-12 w-12 rounded-full flex items-center justify-center ${isToday ? 'bg-blue-600 text-white' : 'bg-slate-100 text-slate-500'}`}>
-                  {isToday ? <Cake className="h-6 w-6 animate-bounce" /> : <Gift className="h-6 w-6" />}
+                <div className={`h-12 w-12 rounded-full overflow-hidden flex-shrink-0 flex items-center justify-center ${isToday ? 'bg-blue-600 text-white' : 'bg-slate-100'}`}>
+                  {isToday ? (
+                    <div className="relative h-full w-full">
+                      <img src={getAvatarUrl(server.nome)} alt="Avatar" className="h-full w-full object-cover" />
+                      <div className="absolute inset-0 bg-blue-600/20 flex items-center justify-center">
+                        <Cake className="h-6 w-6 text-white animate-bounce" />
+                      </div>
+                    </div>
+                  ) : (
+                    <img src={getAvatarUrl(server.nome)} alt="Avatar" className="h-full w-full object-cover" />
+                  )}
                 </div>
                 <div>
                   <h4 className="font-bold text-slate-900 line-clamp-1">{server.nome}</h4>

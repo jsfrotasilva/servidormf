@@ -176,6 +176,14 @@ export const Settings = ({ schoolInfo, onUpdateSchool }: SettingsProps) => {
                   placeholder="UA"
                 />
               </div>
+              <div>
+                <label className="text-sm font-medium text-slate-700 mb-1 block">Código INEP</label>
+                <Input 
+                  value={formData.inep}
+                  onChange={(e) => setFormData({...formData, inep: e.target.value})}
+                  placeholder="INEP"
+                />
+              </div>
               <div className="md:col-span-2">
                 <label className="text-sm font-medium text-slate-700 mb-1 block">Endereço Completo</label>
                 <Input 

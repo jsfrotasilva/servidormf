@@ -75,6 +75,7 @@ export interface SchoolInfo {
   nome: string;
   cie: string;
   ua: string;
+  inep: string;
   endereco: string;
   bairro: string;
   cep: string;
@@ -118,4 +119,12 @@ export interface DashboardStats {
   inactiveServers: number;
   byCategory: { name: string; value: number }[];
   byPosition: { name: string; value: number }[];
+}
+
+export interface User {
+  id: string;
+  email?: string;
+  name?: string;
+  role: 'admin' | 'server';
+  serverId?: string;
 }

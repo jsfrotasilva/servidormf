@@ -10,13 +10,13 @@ import { Guidance } from './pages/Guidance';
 import { Settings } from './pages/Settings';
 import { Birthdays } from './pages/Birthdays';
 import Reports from './pages/Reports';
-import { Login } from './pages/Login';
-import { Server, SchoolInfo } from './types/server';
+import { Server, SchoolInfo, User } from './types/server';
 
 const initialSchoolInfo: SchoolInfo = {
   nome: '',
   cie: '',
   ua: '',
+  inep: '',
   endereco: '',
   bairro: '',
   cep: '',
@@ -28,37 +28,30 @@ const initialSchoolInfo: SchoolInfo = {
   diretorRG: ''
 };
 
+// Usuário padrão com acesso total
+const defaultAdminUser: User = {
+  id: 'admin-master',
+  email: 'josecarlosfrota@gmail.com',
+  name: 'José Carlos Frota da Silva',
+  role: 'admin'
+};
+
 function App() {
-  const [session, setSession] = useState<any>(null);
   const [activeTab, setActiveTab] = useState('dashboard');
   const [servers, setServers] = useState<Server[]>([]);
   const [schoolInfo, setSchoolInfo] = useState<SchoolInfo>(initialSchoolInfo);
-
-  // Gerenciar Sessão de Autenticação
-  useEffect(() => {
-    supabase.auth.getSession().then(({ data: { session } }) => {
-      setSession(session);
-    });
-
-    const { data: { subscription } } = supabase.auth.onAuthStateChange((_event, session) => {
-      setSession(session);
-    });
-
-    return () => subscription.unsubscribe();
-  }, []);
+  const [loading, setLoading] = useState(true);
 
   const fetchData = useCallback(async () => {
-    if (!session) return;
-
     try {
-      // Buscar Servidores do Supabase
+      console.log('Iniciando busca global de dados (Modo Aberto)...');
+
       const { data: serversData, error: serversError } = await supabase
         .from('servers')
         .select('*')
         .order('nome', { ascending: true });
 
       if (serversData && !serversError) {
-        // Mapear do formato do banco para o formato do App
         const mappedServers: Server[] = serversData.map((s: any) => ({
           id: s.id,
           nome: s.nome,
@@ -84,22 +77,19 @@ function App() {
           orientacoesTecnicas: s.guidance || []
         }));
         setServers(mappedServers);
-      } else {
-        const savedServers = localStorage.getItem('server_master_data');
-        if (savedServers) setServers(JSON.parse(savedServers));
       }
 
-      // Buscar Escola do Supabase
       const { data: schoolData, error: schoolError } = await supabase
         .from('school_settings')
         .select('*')
-        .single();
+        .maybeSingle();
       
       if (schoolData && !schoolError) {
         setSchoolInfo({
           nome: schoolData.name || '',
           cie: schoolData.cie || '',
           ua: schoolData.ua || '',
+          inep: schoolData.inep || '',
           endereco: schoolData.address || '',
           bairro: schoolData.neighborhood || '',
           cep: schoolData.zip_code || '',
@@ -111,16 +101,14 @@ function App() {
           diretorRG: schoolData.director_rg || '',
           logo: schoolData.logo_url || undefined
         });
-      } else {
-        const savedSchool = localStorage.getItem('server_master_school');
-        if (savedSchool) setSchoolInfo(JSON.parse(savedSchool));
       }
     } catch (err) {
-      console.error('Erro na conexão inicial:', err);
+      console.error('Erro ao carregar dados:', err);
+    } finally {
+      setLoading(false);
     }
-  }, [session]);
+  }, []);
 
-  // Carregar dados sempre que a sessão mudar
   useEffect(() => {
     fetchData();
   }, [fetchData]);
@@ -163,44 +151,28 @@ function App() {
   };
 
   const saveServersToSupabase = async (updatedServers: Server[]) => {
-    // Filtra servidores válidos (precisa ter nome e CPF) para o banco de dados
     const validServers = updatedServers.filter(s => s.nome?.trim() && s.cpf?.trim());
-    
     setServers(updatedServers);
     localStorage.setItem('server_master_data', JSON.stringify(updatedServers));
 
     try {
       for (const server of validServers) {
         const mapped = mapServerToSupabase(server);
-        const { error } = await supabase.from('servers').upsert(mapped, { onConflict: 'cpf' });
-        if (error) {
-          if (error.code === '23505') {
-            console.warn(`CPF duplicado ignorado: ${server.cpf}`);
-          } else {
-            console.error('Erro no upsert do servidor:', error);
-          }
-        }
+        await supabase.from('servers').upsert(mapped, { onConflict: 'cpf' });
       }
     } catch (err) {
-      console.error('Erro ao sincronizar com Supabase:', err);
+      console.error('Erro ao sincronizar:', err);
     }
   };
 
   const handleUpdateSchool = async (info: SchoolInfo) => {
-    // Garantir que não estamos salvando um nome vazio se já houver um nome definido
-    if (!info.nome && schoolInfo.nome) {
-      console.warn('Tentativa de salvar nome da escola vazio bloqueada.');
-      return;
-    }
-
     setSchoolInfo(info);
-    localStorage.setItem('server_master_school', JSON.stringify(info));
-
     try {
       const mappedSchool = {
         name: info.nome,
         cie: info.cie,
         ua: info.ua,
+        inep: info.inep,
         address: info.endereco,
         neighborhood: info.bairro,
         zip_code: info.cep,
@@ -217,41 +189,30 @@ function App() {
       const { data: existingSchool } = await supabase.from('school_settings').select('id').limit(1);
       
       if (existingSchool && existingSchool.length > 0) {
-        const { error } = await supabase.from('school_settings').update(mappedSchool).eq('id', existingSchool[0].id);
-        if (error) throw error;
+        await supabase.from('school_settings').update(mappedSchool).eq('id', existingSchool[0].id);
       } else {
-        const { error } = await supabase.from('school_settings').insert(mappedSchool);
-        if (error) throw error;
+        await supabase.from('school_settings').insert(mappedSchool);
       }
     } catch (err) {
-      console.error('Erro ao salvar escola no Supabase:', err);
+      console.error('Erro ao salvar escola:', err);
     }
   };
 
   const handleAddServer = (server: Server) => {
-    if (!server.nome?.trim() || !server.cpf?.trim()) {
-      alert('Nome e CPF são campos obrigatórios.');
-      return;
-    }
     saveServersToSupabase([...servers, server]);
   };
 
   const handleUpdateServer = async (serverId: string, data: Partial<Server>) => {
     const serverToUpdate = servers.find(s => s.id === serverId);
     if (!serverToUpdate) return;
-
     const updatedServer = { ...serverToUpdate, ...data };
     const updatedServers = servers.map(s => s.id === serverId ? updatedServer : s);
-    
     setServers(updatedServers);
-    localStorage.setItem('server_master_data', JSON.stringify(updatedServers));
-
     try {
       const mapped = mapServerToSupabase(updatedServer);
-      const { error } = await supabase.from('servers').upsert(mapped);
-      if (error) console.error('Erro ao atualizar servidor no Supabase:', error);
+      await supabase.from('servers').upsert(mapped);
     } catch (err) {
-      console.error('Erro ao atualizar servidor no Supabase:', err);
+      console.error('Erro ao atualizar servidor:', err);
     }
   };
 
@@ -259,26 +220,17 @@ function App() {
     if (confirm('Tem certeza que deseja excluir este servidor?')) {
       const updatedServers = servers.filter(s => s.id !== id);
       setServers(updatedServers);
-      localStorage.setItem('server_master_data', JSON.stringify(updatedServers));
-
       try {
         await supabase.from('servers').delete().eq('id', id);
       } catch (err) {
-        console.error('Erro ao excluir servidor no Supabase:', err);
+        console.error('Erro ao excluir:', err);
       }
     }
   };
 
   const handleImportServers = async (newServers: Server[]) => {
-    // Filtra apenas servidores com dados essenciais
     const filtered = newServers.filter(s => s.nome?.trim() && s.cpf?.trim());
-    
-    if (filtered.length === 0) {
-      alert('Nenhum servidor válido encontrado na planilha. Verifique se as colunas Nome e CPF estão preenchidas.');
-      return;
-    }
-
-    // Mescla com os servidores existentes evitando duplicados por CPF
+    if (filtered.length === 0) return;
     const updated = [...servers];
     filtered.forEach(news => {
       const idx = updated.findIndex(s => s.cpf === news.cpf);
@@ -288,88 +240,53 @@ function App() {
         updated.push(news);
       }
     });
-
     await saveServersToSupabase(updated);
-    alert(`${filtered.length} servidores processados e sincronizados com sucesso!`);
   };
 
   const handleClearServers = async () => {
-    if (confirm('Tem certeza que deseja apagar TODOS os servidores importados? Esta ação não pode ser desfeita.')) {
+    if (confirm('Deseja apagar TODOS os dados?')) {
       setServers([]);
-      localStorage.setItem('server_master_data', JSON.stringify([]));
-      
       try {
-        // No Supabase, deletamos todos (cuidado em produção!)
-        const { error } = await supabase.from('servers').delete().neq('id', '00000000-0000-0000-0000-000000000000');
-        if (error) throw error;
+        await supabase.from('servers').delete().neq('id', '00000000-0000-0000-0000-000000000000');
       } catch (err) {
-        console.error('Erro ao limpar Supabase:', err);
+        console.error('Erro ao limpar:', err);
       }
     }
   };
 
   const renderContent = () => {
     switch (activeTab) {
-      case 'dashboard':
-        return <Dashboard servers={servers} />;
-      case 'servers':
-        return (
-          <Servers 
-            servers={servers}
-            onAddServer={handleAddServer}
-            onUpdateServer={(updatedServer) => handleUpdateServer(updatedServer.id, updatedServer)}
-            onDeleteServer={handleDeleteServer}
-            onImportServers={handleImportServers}
-            onClearServers={handleClearServers}
-          />
-        );
-      case 'benefits':
-        return (
-          <Benefits 
-            servers={servers}
-            onUpdateServer={handleUpdateServer}
-          />
-        );
-      case 'mobility':
-        return (
-          <Mobility 
-            servers={servers}
-            onUpdateServer={handleUpdateServer}
-          />
-        );
-      case 'guidance':
-        return (
-          <Guidance 
-            servers={servers}
-            onUpdateServer={handleUpdateServer}
-          />
-        );
-      case 'birthdays':
-        return (
-          <Birthdays servers={servers} />
-        );
-      case 'reports':
-        return (
-          <Reports servers={servers} school={schoolInfo} />
-        );
-      case 'settings':
-        return (
-          <Settings 
-            schoolInfo={schoolInfo}
-            onUpdateSchool={handleUpdateSchool}
-          />
-        );
-      default:
-        return <Dashboard servers={servers} />;
+      case 'dashboard': return <Dashboard servers={servers} />;
+      case 'servers': return (
+        <Servers 
+          servers={servers}
+          onAddServer={handleAddServer}
+          onUpdateServer={(u) => handleUpdateServer(u.id, u)}
+          onDeleteServer={handleDeleteServer}
+          onImportServers={handleImportServers}
+          onClearServers={handleClearServers}
+        />
+      );
+      case 'benefits': return <Benefits servers={servers} user={defaultAdminUser} onUpdateServer={handleUpdateServer} />;
+      case 'mobility': return <Mobility servers={servers} onUpdateServer={handleUpdateServer} />;
+      case 'guidance': return <Guidance servers={servers} onUpdateServer={handleUpdateServer} />;
+      case 'birthdays': return <Birthdays servers={servers} />;
+      case 'reports': return <Reports servers={servers} school={schoolInfo} />;
+      case 'settings': return <Settings schoolInfo={schoolInfo} onUpdateSchool={handleUpdateSchool} />;
+      default: return <Dashboard servers={servers} />;
     }
   };
 
-  if (!session) {
-    return <Login />;
+  if (loading) {
+    return (
+      <div className="min-h-screen bg-slate-50 flex items-center justify-center">
+        <div className="w-12 h-12 border-4 border-blue-600/20 border-t-blue-600 rounded-full animate-spin" />
+      </div>
+    );
   }
 
   return (
-    <Layout activeTab={activeTab} setActiveTab={setActiveTab}>
+    <Layout activeTab={activeTab} setActiveTab={setActiveTab} user={defaultAdminUser}>
       {renderContent()}
     </Layout>
   );

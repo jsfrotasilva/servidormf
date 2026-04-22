@@ -4,7 +4,6 @@ import {
   LayoutDashboard, 
   Users, 
   Settings, 
-  LogOut, 
   Menu, 
   X,
   Bell,
@@ -17,7 +16,8 @@ import {
   FileText
 } from 'lucide-react';
 import { cn } from './UI';
-import { supabase } from '../lib/supabase';
+import { getAvatarUrl } from '../utils/formatters';
+import { User as UserType } from '../types/server';
 
 interface SidebarItemProps {
   icon: React.ElementType;
@@ -42,27 +42,17 @@ const SidebarItem = ({ icon: Icon, label, active, onClick }: SidebarItemProps) =
   </button>
 );
 
-export const Layout = ({ children, activeTab, setActiveTab }: { 
+export const Layout = ({ children, activeTab, setActiveTab, user }: { 
   children: React.ReactNode;
   activeTab: string;
   setActiveTab: (tab: string) => void;
+  user: UserType | null;
 }) => {
   const [isSidebarOpen, setIsSidebarOpen] = useState(true);
-  const [userName, setUserName] = useState('Usuário');
-
-  React.useEffect(() => {
-    supabase.auth.getUser().then(({ data: { user } }) => {
-      if (user?.user_metadata?.full_name) {
-        setUserName(user.user_metadata.full_name);
-      } else if (user?.email) {
-        setUserName(user.email.split('@')[0]);
-      }
-    });
-  }, []);
+  const userName = user?.name || 'Administrador';
 
   return (
     <div className="flex min-h-screen bg-slate-50">
-      {/* Sidebar */}
       <aside 
         className={cn(
           'fixed inset-y-0 left-0 z-40 w-64 border-r border-slate-200 bg-white transition-transform duration-300 lg:static lg:translate-x-0',
@@ -78,7 +68,7 @@ export const Layout = ({ children, activeTab, setActiveTab }: {
           </div>
         </div>
 
-        <nav className="space-y-1 p-4">
+        <nav className="flex-1 space-y-1 p-4 overflow-y-auto">
           <SidebarItem 
             icon={LayoutDashboard} 
             label="Dashboard" 
@@ -121,28 +111,16 @@ export const Layout = ({ children, activeTab, setActiveTab }: {
             active={activeTab === 'reports'} 
             onClick={() => setActiveTab('reports')}
           />
-        </nav>
-
-        <div className="absolute bottom-0 w-full border-t border-slate-200 p-4">
           <SidebarItem 
             icon={Settings} 
             label="Configurações" 
             active={activeTab === 'settings'}
             onClick={() => setActiveTab('settings')}
           />
-          <SidebarItem 
-            icon={LogOut} 
-            label="Sair" 
-            onClick={async () => {
-              await supabase.auth.signOut();
-            }}
-          />
-        </div>
+        </nav>
       </aside>
 
-      {/* Main Content */}
       <div className="flex flex-1 flex-col overflow-hidden">
-        {/* Topbar */}
         <header className="flex h-16 items-center justify-between border-b border-slate-200 bg-white px-6">
           <button 
             className="lg:hidden"
@@ -171,11 +149,13 @@ export const Layout = ({ children, activeTab, setActiveTab }: {
             <div className="flex items-center gap-3">
               <div className="text-right hidden sm:block">
                 <p className="text-sm font-semibold text-slate-900">{userName}</p>
-                <p className="text-xs text-slate-500">Administrador</p>
+                <span className="inline-flex items-center rounded-full bg-blue-100 px-2 py-0.5 text-[10px] font-medium text-blue-700">
+                  ACESSO TOTAL
+                </span>
               </div>
               <div className="h-9 w-9 rounded-full bg-slate-200 overflow-hidden">
                 <img 
-                  src="https://api.dicebear.com/7.x/avataaars/svg?seed=Felix" 
+                  src={getAvatarUrl(userName)} 
                   alt="Avatar"
                   className="h-full w-full object-cover"
                 />
@@ -184,7 +164,6 @@ export const Layout = ({ children, activeTab, setActiveTab }: {
           </div>
         </header>
 
-        {/* Page Area */}
         <main className="flex-1 overflow-y-auto p-6">
           <div className="mx-auto max-w-7xl">
             {children}

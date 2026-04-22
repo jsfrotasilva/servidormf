@@ -27,15 +27,28 @@ const WhatsAppIcon = () => (
 import { Button, Input, Card, Badge, Modal } from '../components/UI';
 import { Server } from '../types/server';
 import { processExcelFile, downloadExcelTemplate } from '../utils/excelProcessor';
-import { formatDisplayDate, formatCPF, formatPhone } from '../utils/formatters';
+import { formatDisplayDate, formatCPF, formatPhone, getAvatarUrl } from '../utils/formatters';
 
-// Helper to add days to a date string
-const addDays = (dateStr: string, days: number): string => {
+// Helper to add years inclusively (fixed 365 days)
+const addYearsInclusive = (dateStr: string, years: number): string => {
   if (!dateStr) return '';
-  const date = new Date(dateStr);
-  if (isNaN(date.getTime())) return '';
-  date.setDate(date.getDate() + days);
-  return date.toISOString().split('T')[0];
+  const [year, month, day] = dateStr.split('-').map(Number);
+  
+  let targetYear = year + years;
+  let targetMonth = month;
+  let targetDay = day - 1;
+
+  if (targetDay === 0) {
+    targetMonth = month - 1;
+    if (targetMonth === 0) {
+      targetMonth = 12;
+      targetYear = year + (years - 1);
+    }
+    const daysInMonth = [31, 28, 31, 30, 31, 30, 31, 31, 30, 31, 30, 31];
+    targetDay = daysInMonth[targetMonth - 1];
+  }
+
+  return `${targetYear}-${String(targetMonth).padStart(2, '0')}-${String(targetDay).padStart(2, '0')}`;
 };
 
 interface ServersProps {
@@ -74,7 +87,6 @@ export const Servers = ({
     const birth = new Date(birthdate);
     if (isNaN(birth.getTime())) return false;
     
-    // Adjusted for typical date input issues (timezone)
     const birthDay = birth.getDate() + 1;
     const birthMonth = birth.getMonth() + 1;
     
@@ -210,9 +222,18 @@ export const Servers = ({
               {filteredServers.map((server) => (
                 <tr key={server.id} className="hover:bg-slate-50 transition-colors">
                   <td className="px-6 py-4">
-                    <div>
-                      <div className="font-medium text-slate-900">{server.nome}</div>
-                      <div className="text-xs text-slate-500">{server.email}</div>
+                    <div className="flex items-center gap-3">
+                      <div className="h-8 w-8 rounded-full bg-slate-100 overflow-hidden flex-shrink-0">
+                        <img 
+                          src={getAvatarUrl(server.nome)} 
+                          alt="Avatar"
+                          className="h-full w-full object-cover"
+                        />
+                      </div>
+                      <div>
+                        <div className="font-medium text-slate-900">{server.nome}</div>
+                        <div className="text-xs text-slate-500">{server.email}</div>
+                      </div>
                     </div>
                   </td>
                   <td className="px-6 py-4">
@@ -367,7 +388,16 @@ export const Servers = ({
           <div className="space-y-6">
             <div className="grid grid-cols-2 gap-x-4 gap-y-4">
               <div className="col-span-2 pb-2 border-b border-slate-100 flex justify-between items-center">
-                <h3 className="text-sm font-semibold text-blue-600 uppercase tracking-wider">Informações Pessoais</h3>
+                <div className="flex items-center gap-3">
+                  <div className="h-10 w-10 rounded-full bg-slate-100 overflow-hidden">
+                    <img 
+                      src={getAvatarUrl(viewingServer.nome)} 
+                      alt="Avatar"
+                      className="h-full w-full object-cover"
+                    />
+                  </div>
+                  <h3 className="text-sm font-semibold text-blue-600 uppercase tracking-wider">Informações Pessoais</h3>
+                </div>
               </div>
               <div>
                 <p className="text-xs text-slate-500 uppercase">Nome</p>
@@ -449,71 +479,82 @@ export const Servers = ({
 
                   {!showBenefitDetails ? (
                     <>
-                      <div>
-                        <p className="text-xs text-slate-500 uppercase">ATS (Quinquênios)</p>
-                        <p className="text-sm font-medium text-slate-900">{viewingServer.ats?.length || 0} registrados</p>
-                      </div>
-                      <div>
-                        <p className="text-xs text-slate-500 uppercase">Sexta-Parte</p>
-                        <Badge variant={viewingServer.sextaParte ? 'info' : 'outline'}>
-                          {viewingServer.sextaParte ? 'Concedido' : 'Não cadastrado'}
-                        </Badge>
-                      </div>
+                      {/* Only show these if NOT PEFM + A-EFETIVO */}
+                      {!(viewingServer.cargo?.toUpperCase().trim() === 'PEFM' && viewingServer.categoria?.toUpperCase().trim() === 'A-EFETIVO') && (
+                        <>
+                          <div>
+                            <p className="text-xs text-slate-500 uppercase">ATS (Quinquênios)</p>
+                            <p className="text-sm font-medium text-slate-900">{viewingServer.ats?.length || 0} registrados</p>
+                          </div>
+                          <div>
+                            <p className="text-xs text-slate-500 uppercase">Sexta-Parte</p>
+                            <Badge variant={viewingServer.sextaParte ? 'info' : 'outline'}>
+                              {viewingServer.sextaParte ? 'Concedido' : 'Não cadastrado'}
+                            </Badge>
+                          </div>
+                        </>
+                      )}
                       <div>
                         <p className="text-xs text-slate-500 uppercase">Licenças-Prêmio</p>
                         <p className="text-sm font-medium text-slate-900">{viewingServer.licencasPremio?.length || 0} certidões</p>
                       </div>
-                      <div>
-                        <p className="text-xs text-slate-500 uppercase">Evoluções Funcionais</p>
-                        <p className="text-sm font-medium text-slate-900">{viewingServer.evolucoesFuncionais?.length || 0} registros</p>
-                      </div>
+                      {!(viewingServer.cargo?.toUpperCase().trim() === 'PEFM' && viewingServer.categoria?.toUpperCase().trim() === 'A-EFETIVO') && (
+                        <div>
+                          <p className="text-xs text-slate-500 uppercase">Evoluções Funcionais</p>
+                          <p className="text-sm font-medium text-slate-900">{viewingServer.evolucoesFuncionais?.length || 0} registrados</p>
+                        </div>
+                      )}
                     </>
                   ) : (
                     <div className="col-span-2 space-y-6 animate-in fade-in slide-in-from-top-2 duration-300">
-                      {/* Detalhes de ATS */}
-                      <div className="bg-slate-50 p-4 rounded-lg border border-slate-100">
-                        <h4 className="text-xs font-bold text-slate-700 uppercase mb-3 flex items-center gap-2">
-                          <div className="h-1 w-1 rounded-full bg-blue-500" />
-                          Histórico de ATS (Quinquênios)
-                        </h4>
-                        {viewingServer.ats && viewingServer.ats.length > 0 ? (
-                          <div className="space-y-3">
-                            {viewingServer.ats.map((item, idx) => (
-                              <div key={idx} className="text-sm bg-white p-2 rounded shadow-sm border border-slate-100">
-                                <div className="font-semibold text-slate-900">{item.motivo}</div>
-                                <div className="grid grid-cols-2 gap-2 mt-1 text-xs text-slate-600">
-                                  <span>Vigência: {formatDisplayDate(item.vigencia)}</span>
-                                  <span>DOE: {formatDisplayDate(item.dataPublicacaoDOE)}</span>
-                                </div>
-                                {item.ultimoAts && (
-                                  <div className="mt-1 text-[10px] font-bold text-orange-600 uppercase">
-                                    Próximo Vencimento: {formatDisplayDate(addDays(item.vigencia, 1825))}
+                      {/* Detalhes de ATS - Hide if PEFM + A-EFETIVO */}
+                      {!(viewingServer.cargo?.toUpperCase().trim() === 'PEFM' && viewingServer.categoria?.toUpperCase().trim() === 'A-EFETIVO') && (
+                        <div className="bg-slate-50 p-4 rounded-lg border border-slate-100">
+                          <h4 className="text-xs font-bold text-slate-700 uppercase mb-3 flex items-center gap-2">
+                            <div className="h-1 w-1 rounded-full bg-blue-500" />
+                            Histórico de ATS (Quinquênios)
+                          </h4>
+                          {viewingServer.ats && viewingServer.ats.length > 0 ? (
+                            <div className="space-y-3">
+                              {viewingServer.ats.map((item, idx) => (
+                                <div key={idx} className="text-sm bg-white p-2 rounded shadow-sm border border-slate-100">
+                                  <div className="font-semibold text-slate-900">{item.motivo}</div>
+                                  <div className="grid grid-cols-2 gap-2 mt-1 text-xs text-slate-600">
+                                    <span>Vigência: {formatDisplayDate(item.vigencia)}</span>
+                                    <span>DOE: {formatDisplayDate(item.dataPublicacaoDOE)}</span>
                                   </div>
-                                )}
-                              </div>
-                            ))}
-                          </div>
-                        ) : <p className="text-xs text-slate-400 italic">Nenhum ATS registrado.</p>}
-                      </div>
-
-                      {/* Detalhes da Sexta-Parte */}
-                      <div className="bg-slate-50 p-4 rounded-lg border border-slate-100">
-                        <h4 className="text-xs font-bold text-slate-700 uppercase mb-3 flex items-center gap-2">
-                          <div className="h-1 w-1 rounded-full bg-purple-500" />
-                          Sexta-Parte
-                        </h4>
-                        {viewingServer.sextaParte ? (
-                          <div className="text-sm bg-white p-2 rounded shadow-sm border border-slate-100">
-                            <div className="font-semibold text-slate-900">Benefício Concedido</div>
-                            <div className="grid grid-cols-2 gap-2 mt-1 text-xs text-slate-600">
-                              <span>Vigência: {formatDisplayDate(viewingServer.sextaParte.vigencia)}</span>
-                              <span>DOE: {formatDisplayDate(viewingServer.sextaParte.dataPublicacaoDOE)}</span>
+                                  {item.ultimoAts && (
+                                    <div className="mt-1 text-[10px] font-bold text-orange-600 uppercase">
+                                      Próximo Vencimento: {formatDisplayDate(addYearsInclusive(item.vigencia, 5))}
+                                    </div>
+                                  )}
+                                </div>
+                              ))}
                             </div>
-                          </div>
-                        ) : <p className="text-xs text-slate-400 italic">Não concedido.</p>}
-                      </div>
+                          ) : <p className="text-xs text-slate-400 italic">Nenhum ATS registrado.</p>}
+                        </div>
+                      )}
 
-                      {/* Detalhes de Licença Prêmio */}
+                      {/* Detalhes da Sexta-Parte - Hide if PEFM + A-EFETIVO */}
+                      {!(viewingServer.cargo?.toUpperCase().trim() === 'PEFM' && viewingServer.categoria?.toUpperCase().trim() === 'A-EFETIVO') && (
+                        <div className="bg-slate-50 p-4 rounded-lg border border-slate-100">
+                          <h4 className="text-xs font-bold text-slate-700 uppercase mb-3 flex items-center gap-2">
+                            <div className="h-1 w-1 rounded-full bg-purple-500" />
+                            Sexta-Parte
+                          </h4>
+                          {viewingServer.sextaParte ? (
+                            <div className="text-sm bg-white p-2 rounded shadow-sm border border-slate-100">
+                              <div className="font-semibold text-slate-900">Benefício Concedido</div>
+                              <div className="grid grid-cols-2 gap-2 mt-1 text-xs text-slate-600">
+                                <span>Vigência: {formatDisplayDate(viewingServer.sextaParte.vigencia)}</span>
+                                <span>DOE: {formatDisplayDate(viewingServer.sextaParte.dataPublicacaoDOE)}</span>
+                              </div>
+                            </div>
+                          ) : <p className="text-xs text-slate-400 italic">Não concedido.</p>}
+                        </div>
+                      )}
+
+                      {/* Detalhes de Licença Prêmio - Always show */}
                       <div className="bg-slate-50 p-4 rounded-lg border border-slate-100">
                         <h4 className="text-xs font-bold text-slate-700 uppercase mb-3 flex items-center gap-2">
                           <div className="h-1 w-1 rounded-full bg-emerald-500" />
@@ -543,11 +584,10 @@ export const Servers = ({
                                   
                                   {cert.ultimaCertidao && cert.inicioVigenciaProxima && (
                                     <div className="mt-1 text-[9px] font-bold text-blue-600 uppercase">
-                                      Próxima Certidão: {formatDisplayDate(cert.inicioVigenciaProxima)} até {formatDisplayDate(addDays(cert.inicioVigenciaProxima, 1825))}
+                                      Próxima Certidão: {formatDisplayDate(cert.inicioVigenciaProxima)} até {formatDisplayDate(addYearsInclusive(cert.inicioVigenciaProxima, 5))}
                                     </div>
                                   )}
 
-                                  {/* Usos da Certidão */}
                                   {utilizacoes.length > 0 && (
                                     <div className="mt-2 pt-2 border-t border-slate-50 space-y-1">
                                       <p className="text-[9px] font-bold text-slate-400 uppercase">Histórico de Uso:</p>
@@ -570,29 +610,53 @@ export const Servers = ({
                         ) : <p className="text-xs text-slate-400 italic">Nenhuma certidão registrada.</p>}
                       </div>
 
-                      {/* Detalhes de Evolução Funcional */}
-                      <div className="bg-slate-50 p-4 rounded-lg border border-slate-100">
-                        <h4 className="text-xs font-bold text-slate-700 uppercase mb-3 flex items-center gap-2">
-                          <div className="h-1 w-1 rounded-full bg-indigo-500" />
-                          Evolução Funcional
-                        </h4>
-                        {viewingServer.evolucoesFuncionais && viewingServer.evolucoesFuncionais.length > 0 ? (
-                          <div className="space-y-2">
-                            {viewingServer.evolucoesFuncionais.map((ev) => (
-                              <div key={ev.id} className="text-sm bg-white p-2 rounded shadow-sm border border-slate-100">
-                                <div className="font-semibold text-slate-900">{ev.motivo}</div>
-                                <div className="text-xs text-slate-700 mt-1">
-                                  Nível {ev.nivelDe} <span className="text-slate-400">→</span> Nível {ev.nivelPara}
+                      {/* Detalhes de Evolução Funcional - Hide if PEFM + A-EFETIVO */}
+                      {!(viewingServer.cargo?.toUpperCase().trim() === 'PEFM' && viewingServer.categoria?.toUpperCase().trim() === 'A-EFETIVO') && (
+                        <div className="bg-slate-50 p-4 rounded-lg border border-slate-100">
+                          <h4 className="text-xs font-bold text-slate-700 uppercase mb-3 flex items-center gap-2">
+                            <div className="h-1 w-1 rounded-full bg-indigo-500" />
+                            Evolução Funcional
+                          </h4>
+                          {viewingServer.evolucoesFuncionais && viewingServer.evolucoesFuncionais.length > 0 ? (
+                            <div className="space-y-2">
+                              {viewingServer.evolucoesFuncionais.map((ev) => (
+                                <div key={ev.id} className="text-sm bg-white p-2 rounded shadow-sm border border-slate-100">
+                                  <div className="font-semibold text-slate-900">{ev.motivo}</div>
+                                  <div className="text-xs text-slate-700 mt-1">
+                                    Nível {ev.nivelDe} <span className="text-slate-400">→</span> Nível {ev.nivelPara}
+                                  </div>
+                                  <div className="grid grid-cols-2 gap-2 mt-1 text-[10px] text-slate-500">
+                                    <span>Vigência: {formatDisplayDate(ev.vigencia)}</span>
+                                    <span>DOE: {formatDisplayDate(ev.dataPublicacaoDOE)}</span>
+                                  </div>
+                                  {ev.isUltima && (
+                                    <div className="mt-3 pt-2 border-t border-red-50">
+                                      <p className="text-[10px] font-bold text-red-600 uppercase">
+                                        PROVÁVEL DATA DA PRÓXIMA VIGÊNCIA: {(() => {
+                                          let years = 4;
+                                          if (ev.nivelPara === 'III' || ev.nivelPara === 'IV') years = 5;
+                                          return formatDisplayDate(addYearsInclusive(ev.vigencia, years));
+                                        })()}
+                                      </p>
+                                      <p className="text-[9px] font-bold text-red-500 uppercase mt-1">
+                                        Critérios Necessários: {(() => {
+                                          let text = "Interstício 4 anos | Mín. 60 pts | Pesos 3/3/4";
+                                          const level = ev.nivelPara;
+                                          if (level === 'I') text = "Interstício 4 anos | Mín. 35 pts | Pesos 4/4/2";
+                                          else if (level === 'II') text = "Interstício 4 anos | Mín. 40 pts | Pesos 4/4/2";
+                                          else if (level === 'III') text = "Interstício 5 anos | Mín. 50 pts | Pesos 3/3/4";
+                                          else if (level === 'IV') text = "Interstício 5 anos | Mín. 60 pts | Pesos 3/3/4";
+                                          return text;
+                                        })()}
+                                      </p>
+                                    </div>
+                                  )}
                                 </div>
-                                <div className="grid grid-cols-2 gap-2 mt-1 text-[10px] text-slate-500">
-                                  <span>Vigência: {formatDisplayDate(ev.vigencia)}</span>
-                                  <span>DOE: {formatDisplayDate(ev.dataPublicacaoDOE)}</span>
-                                </div>
-                              </div>
-                            ))}
-                          </div>
-                        ) : <p className="text-xs text-slate-400 italic">Nenhum registro de evolução.</p>}
-                      </div>
+                              ))}
+                            </div>
+                          ) : <p className="text-xs text-slate-400 italic">Nenhum registro de evolução.</p>}
+                        </div>
+                      )}
                     </div>
                   )}
                 </>

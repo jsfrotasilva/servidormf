@@ -306,12 +306,27 @@ const Reports: React.FC<ReportsProps> = ({ servers, school }) => {
 
   const addYearsInclusive = (dateStr: string, years: number) => {
     if (!dateStr) return '';
-    const date = new Date(dateStr + 'T12:00:00');
-    // For 4 years: 4 * 365 = 1460 days. Inclusive day 1: 1460 - 1 = 1459 days added.
-    // For 5 years: 5 * 365 = 1825 days. Inclusive day 1: 1825 - 1 = 1824 days added.
-    const daysToAdd = (years * 365) - 1;
-    date.setDate(date.getDate() + daysToAdd);
-    return date.toISOString().split('T')[0];
+    const [year, month, day] = dateStr.split('-').map(Number);
+    
+    let targetYear = year + years;
+    let targetMonth = month;
+    let targetDay = day - 1;
+
+    if (targetDay === 0) {
+      targetMonth = month - 1;
+      if (targetMonth === 0) {
+        targetMonth = 12;
+        targetYear = year + (years - 1);
+      }
+      const daysInMonth = [31, 28, 31, 30, 31, 30, 31, 31, 30, 31, 30, 31];
+      targetDay = daysInMonth[targetMonth - 1];
+    }
+
+    const y = targetYear;
+    const m = String(targetMonth).padStart(2, '0');
+    const d = String(targetDay).padStart(2, '0');
+    
+    return `${y}-${m}-${d}`;
   };
 
   const renderConcessionsReport = () => {
