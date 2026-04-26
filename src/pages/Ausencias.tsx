@@ -32,28 +32,44 @@ export const Ausencias: React.FC<AusenciasProps> = ({ servers, user, onUpdateSer
   const handleAddAusencia = () => {
     if (!selectedServer) return;
     
+    // Prepare ausencia data - only include relevant fields based on type
+    const ausenciaData: any = {
+      id: editingAusenciaId || Math.random().toString(36).substr(2, 9),
+      tipo: newAusencia.tipo,
+      descricao: newAusencia.descricao || ''
+    };
+
+    // Add type-specific fields
+    if (newAusencia.tipo === 'Licença') {
+      ausenciaData.dataInicio = newAusencia.dataInicio || '';
+      ausenciaData.dataFim = newAusencia.dataFim || '';
+      ausenciaData.doePublicacao = newAusencia.doePublicacao || '';
+    } else {
+      ausenciaData.data = newAusencia.data || format(new Date(), 'yyyy-MM-dd');
+    }
+    
+    let updatedAusencias;
     if (editingAusenciaId) {
-      onUpdateServer(selectedServer.id, {
-        ausencias: (selectedServer.ausencias || []).map(a =>
-          a.id === editingAusenciaId ? { ...newAusencia, id: a.id } : a
-        )
-      });
+      updatedAusencias = (selectedServer.ausencias || []).map(a =>
+        a.id === editingAusenciaId ? ausenciaData : a
+      );
       setEditingAusenciaId(null);
     } else {
-      const ausenciaRecord: Ausencia = {
-        ...newAusencia,
-        id: Math.random().toString(36).substr(2, 9)
-      };
-      onUpdateServer(selectedServer.id, {
-        ausencias: [...(selectedServer.ausencias || []), ausenciaRecord]
-      });
+      updatedAusencias = [...(selectedServer.ausencias || []), ausenciaData];
     }
+    
+    onUpdateServer(selectedServer.id, {
+      ausencias: updatedAusencias
+    });
     
     setShowAddAusencia(false);
     setNewAusencia({
       data: format(new Date(), 'yyyy-MM-dd'),
       tipo: 'Parcial',
-      descricao: ''
+      descricao: '',
+      dataInicio: '',
+      dataFim: '',
+      doePublicacao: ''
     });
   };
 
