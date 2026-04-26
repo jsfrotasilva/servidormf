@@ -23,7 +23,10 @@ export const Ausencias: React.FC<AusenciasProps> = ({ servers, user, onUpdateSer
   const [newAusencia, setNewAusencia] = useState<Omit<Ausencia, 'id'>>({
     data: format(new Date(), 'yyyy-MM-dd'),
     tipo: 'Parcial',
-    descricao: ''
+    descricao: '',
+    dataInicio: '',
+    dataFim: '',
+    doePublicacao: ''
   });
 
   const handleAddAusencia = () => {
@@ -56,9 +59,12 @@ export const Ausencias: React.FC<AusenciasProps> = ({ servers, user, onUpdateSer
 
   const handleEditAusencia = (ausencia: Ausencia) => {
     setNewAusencia({
-      data: ausencia.data,
+      data: ausencia.data || '',
       tipo: ausencia.tipo,
-      descricao: ausencia.descricao
+      descricao: ausencia.descricao || '',
+      dataInicio: ausencia.dataInicio || '',
+      dataFim: ausencia.dataFim || '',
+      doePublicacao: ausencia.doePublicacao || ''
     });
     setEditingAusenciaId(ausencia.id);
     setShowAddAusencia(true);
@@ -143,15 +149,7 @@ export const Ausencias: React.FC<AusenciasProps> = ({ servers, user, onUpdateSer
                 </div>
                 {showAddAusencia && (
                   <div className="bg-red-50 p-4 rounded-lg mb-6 space-y-4">
-                    <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
-                      <div className="space-y-1">
-                        <label className="text-xs font-bold text-gray-500">Data</label>
-                        <Input 
-                          type="date" 
-                          value={newAusencia.data} 
-                          onChange={e => setNewAusencia({...newAusencia, data: e.target.value})} 
-                        />
-                      </div>
+                    <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
                       <div className="space-y-1">
                         <label className="text-xs font-bold text-gray-500">Tipo de Ausência</label>
                         <select 
@@ -161,16 +159,64 @@ export const Ausencias: React.FC<AusenciasProps> = ({ servers, user, onUpdateSer
                         >
                           <option value="Parcial">Parcial</option>
                           <option value="Total">Total</option>
+                          <option value="Licença">Licença</option>
                         </select>
                       </div>
-                      <div className="space-y-1">
-                        <label className="text-xs font-bold text-gray-500">Descrição</label>
-                        <Input 
-                          placeholder="Ex: Falta médica, consulta médica..." 
-                          value={newAusencia.descricao} 
-                          onChange={e => setNewAusencia({...newAusencia, descricao: e.target.value})} 
-                        />
-                      </div>
+                      {newAusencia.tipo === 'Licença' ? (
+                        <>
+                          <div className="space-y-1">
+                            <label className="text-xs font-bold text-gray-500">Data Início</label>
+                            <Input 
+                              type="date" 
+                              value={newAusencia.dataInicio || ''} 
+                              onChange={e => setNewAusencia({...newAusencia, dataInicio: e.target.value})} 
+                            />
+                          </div>
+                          <div className="space-y-1">
+                            <label className="text-xs font-bold text-gray-500">Data Fim</label>
+                            <Input 
+                              type="date" 
+                              value={newAusencia.dataFim || ''} 
+                              onChange={e => setNewAusencia({...newAusencia, dataFim: e.target.value})} 
+                            />
+                          </div>
+                          <div className="space-y-1 md:col-span-2">
+                            <label className="text-xs font-bold text-gray-500">Publicação em DOE</label>
+                            <Input 
+                              type="date" 
+                              value={newAusencia.doePublicacao || ''} 
+                              onChange={e => setNewAusencia({...newAusencia, doePublicacao: e.target.value})} 
+                            />
+                          </div>
+                          <div className="space-y-1 md:col-span-2">
+                            <label className="text-xs font-bold text-gray-500">Descrição</label>
+                            <Input 
+                              placeholder="Ex: Licença saúde, licença prêmio..." 
+                              value={newAusencia.descricao} 
+                              onChange={e => setNewAusencia({...newAusencia, descricao: e.target.value})} 
+                            />
+                          </div>
+                        </>
+                      ) : (
+                        <>
+                          <div className="space-y-1">
+                            <label className="text-xs font-bold text-gray-500">Data</label>
+                            <Input 
+                              type="date" 
+                              value={newAusencia.data} 
+                              onChange={e => setNewAusencia({...newAusencia, data: e.target.value})} 
+                            />
+                          </div>
+                          <div className="space-y-1 md:col-span-2">
+                            <label className="text-xs font-bold text-gray-500">Descrição</label>
+                            <Input 
+                              placeholder="Ex: Falta médica, consulta médica..." 
+                              value={newAusencia.descricao} 
+                              onChange={e => setNewAusencia({...newAusencia, descricao: e.target.value})} 
+                            />
+                          </div>
+                        </>
+                      )}
                     </div>
                     <Button onClick={handleAddAusencia} className="w-full bg-red-600">
                       {editingAusenciaId ? 'Atualizar Ausência' : 'Registrar Ausência'}
@@ -180,19 +226,26 @@ export const Ausencias: React.FC<AusenciasProps> = ({ servers, user, onUpdateSer
                 <div className="space-y-2">
                   {selectedServer.ausencias?.map(a => (
                     <div key={a.id} className="flex items-center justify-between p-3 border-l-4 border-l-red-400 bg-white border border-gray-100 rounded-r-lg shadow-sm">
-                      <div className="flex items-center gap-4">
-                        <div className="p-2 rounded-full bg-red-50 text-red-600">
-                          <Calendar className="w-4 h-4" />
+                      <div className="flex-1">
+                        <div className="flex items-center gap-2 mb-1">
+                          <div className="p-1.5 rounded-full bg-red-50 text-red-600">
+                            <Calendar className="w-3 h-3" />
+                          </div>
+                          <p className="font-bold text-sm">{a.tipo === 'Total' ? 'AUSENCIA TOTAL' : a.tipo === 'Licença' ? 'LICENÇA' : 'AUSENCIA PARCIAL'}</p>
                         </div>
-                        <div>
-                          <p className="font-bold text-sm">{a.tipo === 'Total' ? 'AUSENCIA TOTAL' : 'AUSENCIA PARCIAL'}</p>
-                          <p className="text-xs text-gray-700">{a.descricao}</p>
-                          <p className="text-[10px] text-gray-500">
+                        <p className="text-xs text-gray-700 ml-5">{a.descricao}</p>
+                        {a.tipo === 'Licença' ? (
+                          <div className="text-[10px] text-gray-500 ml-5 mt-1 space-y-0.5">
+                            <p>Início: {formatDisplayDate(a.dataInicio || '')} | Fim: {formatDisplayDate(a.dataFim || '')}</p>
+                            <p>DOE: {formatDisplayDate(a.doePublicacao || '')}</p>
+                          </div>
+                        ) : (
+                          <p className="text-[10px] text-gray-500 ml-5 mt-1">
                             Data: {formatDisplayDate(a.data)}
                           </p>
-                        </div>
+                        )}
                       </div>
-                      <div className="flex gap-2">
+                      <div className="flex gap-2 flex-shrink-0">
                         <button onClick={() => handleEditAusencia(a)} className="text-blue-500 hover:text-blue-700 transition-colors">
                           <FileText className="w-4 h-4" />
                         </button>

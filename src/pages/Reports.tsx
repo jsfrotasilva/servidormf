@@ -3,6 +3,7 @@ import { Printer, Users, ClipboardCheck, Truck, BookOpen, X, Search, Calendar } 
 import { Server, Locomocao, OrientacaoTecnica, SchoolInfo } from '../types/server';
 import { Card, Button, Input } from '../components/UI';
 import { format } from 'date-fns';
+import { formatDisplayDate } from '../utils/formatters';
 
 interface ReportsProps {
   servers: Server[];
@@ -348,21 +349,28 @@ const Reports: React.FC<ReportsProps> = ({ servers, school }) => {
                 <table className="w-full border-collapse border-2 border-black text-[10pt]">
                   <thead>
                     <tr className="bg-gray-200 print:bg-gray-100">
-                      <th className="border-2 border-black p-2 text-left w-28 font-bold">DATA</th>
-                      <th className="border-2 border-black p-2 text-left font-bold">TIPO</th>
+                      <th className="border-2 border-black p-2 text-left w-24 font-bold">DATA/PERÍODO</th>
+                      <th className="border-2 border-black p-2 text-left w-24 font-bold">TIPO</th>
                       <th className="border-2 border-black p-2 text-left font-bold">DESCRIÇÃO</th>
+                      <th className="border-2 border-black p-2 text-left w-28 font-bold">DOE</th>
                     </tr>
                   </thead>
                   <tbody>
                     {ausenciasInMonth.map((a, i) => (
                       <tr key={i} className={i % 2 === 0 ? 'bg-white' : 'bg-gray-50'}>
                         <td className="border-2 border-black p-2 font-semibold">
-                          {new Date(a.data + 'T00:00:00').toLocaleDateString('pt-BR')}
+                          {a.tipo === 'Licença' 
+                            ? `${formatDisplayDate(a.dataInicio || '')} a ${formatDisplayDate(a.dataFim || '')}`
+                            : formatDisplayDate(a.data)
+                          }
                         </td>
                         <td className="border-2 border-black p-2 font-semibold">
-                          {a.tipo === 'Total' ? 'TOTAL' : 'PARCIAL'}
+                          {a.tipo === 'Licença' ? 'LICENÇA' : a.tipo === 'Total' ? 'TOTAL' : 'PARCIAL'}
                         </td>
                         <td className="border-2 border-black p-2 font-medium">{a.descricao}</td>
+                        <td className="border-2 border-black p-2 font-semibold">
+                          {a.tipo === 'Licença' ? formatDisplayDate(a.doePublicacao || '') : '-'}
+                        </td>
                       </tr>
                     ))}
                   </tbody>

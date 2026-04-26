@@ -71,13 +71,16 @@ export interface OrientacaoTecnica {
   pagoDiaria: boolean;
 }
 
-export type AusenciaTipo = 'Parcial' | 'Total';
+export type AusenciaTipo = 'Parcial' | 'Total' | 'Licença';
 
 export interface Ausencia {
   id: string;
   data: string;
   tipo: AusenciaTipo;
   descricao: string;
+  dataInicio?: string;
+  dataFim?: string;
+  doePublicacao?: string;
 }
 
 export interface SchoolInfo {
