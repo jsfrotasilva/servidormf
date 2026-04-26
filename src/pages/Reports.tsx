@@ -18,7 +18,9 @@ const Reports: React.FC<ReportsProps> = ({ servers, school }) => {
   const activeServers = servers.filter(s => s.ativo === 'Sim');
   
   const serversWithActivity = servers.filter(s => 
-    (s.locomocoes && s.locomocoes.length > 0) || (s.orientacoesTecnicas && s.orientacoesTecnicas.length > 0)
+    (s.locomocoes && s.locomocoes.length > 0) || 
+    (s.orientacoesTecnicas && s.orientacoesTecnicas.length > 0) ||
+    (s.ausencias && s.ausencias.length > 0)
   );
 
   const handlePrint = () => {
@@ -169,6 +171,12 @@ const Reports: React.FC<ReportsProps> = ({ servers, school }) => {
       return m_month === month && y === year;
     }) || [];
 
+    const ausenciasInMonth = server?.ausencias?.filter((a) => {
+      const dateStr = a.data.includes('-') ? a.data : a.data.split('/').reverse().join('-');
+      const [y, m_month] = dateStr.split('-');
+      return m_month === month && y === year;
+    }) || [];
+
     return (
       <div className="p-8 print:p-0 bg-white font-sans">
         <div className="flex flex-col gap-4 mb-6 print:hidden">
@@ -209,90 +217,163 @@ const Reports: React.FC<ReportsProps> = ({ servers, school }) => {
           <div className="animate-in fade-in duration-500">
             <PrintHeader title="Relatório Mensal de Atividades" />
 
-            <div className="mt-6 mb-6 px-4 py-3 bg-gray-50 border border-black print:bg-transparent grid grid-cols-2 gap-y-2 text-[11px] leading-relaxed">
-              <p><strong>SERVIDOR:</strong> {server.nome?.toUpperCase()}</p>
-              <p><strong>CARGO:</strong> {server.cargo?.toUpperCase()}</p>
-              <p><strong>RG/CIN:</strong> {server.rgcin}</p>
-              <p><strong>MÊS DE REFERÊNCIA:</strong> {month}/{year}</p>
+            {/* Informações do Servidor e Diretor na mesma linha - Layout Sofisticado */}
+            <div className="mt-4 mb-6 border-2 border-black print:border-black">
+              <table className="w-full">
+                <tbody>
+                  <tr className="bg-gradient-to-r from-blue-50 to-blue-100 print:bg-gray-100">
+                    <td className="border-r border-black p-2 w-1/3">
+                      <p className="text-[9px] font-bold uppercase text-gray-600 print:text-black">SERVIDOR</p>
+                      <p className="text-[11pt] font-bold uppercase">{server.nome}</p>
+                    </td>
+                    <td className="border-r border-black p-2 w-1/3">
+                      <p className="text-[9px] font-bold uppercase text-gray-600 print:text-black">CARGO</p>
+                      <p className="text-[11pt] font-bold uppercase">{server.cargo}</p>
+                    </td>
+                    <td className="border-r border-black p-2 w-1/4">
+                      <p className="text-[9px] font-bold uppercase text-gray-600 print:text-black">RG/CIN</p>
+                      <p className="text-[11pt] font-bold">{server.rgcin}</p>
+                    </td>
+                    <td className="p-2 w-1/6">
+                      <p className="text-[9px] font-bold uppercase text-gray-600 print:text-black">REF.</p>
+                      <p className="text-[11pt] font-bold">{month}/{year}</p>
+                    </td>
+                  </tr>
+                  <tr className="bg-gradient-to-r from-purple-50 to-purple-100 print:bg-gray-50">
+                    <td className="border-r border-black p-2">
+                      <p className="text-[9px] font-bold uppercase text-gray-600 print:text-black">DIRETOR(A)</p>
+                      <p className="text-[10pt] font-bold">{school?.diretor || 'Direção Escolar'}</p>
+                    </td>
+                    <td className="border-r border-black p-2">
+                      <p className="text-[9px] font-bold uppercase text-gray-600 print:text-black">RG DIRETOR</p>
+                      <p className="text-[10pt] font-bold">{school?.diretorRG || '_______-___'}</p>
+                    </td>
+                    <td className="border-r border-black p-2">
+                      <p className="text-[9px] font-bold uppercase text-gray-600 print:text-black">UNIDADE</p>
+                      <p className="text-[10pt] font-bold">{school?.nome || 'EE PROFA. MARLENE FRATTINI'}</p>
+                    </td>
+                    <td className="p-2 text-right">
+                      <p className="text-[9px] font-bold uppercase text-gray-600 print:text-black">DATA EMISSÃO</p>
+                      <p className="text-[10pt] font-bold">{format(new Date(), 'dd/MM/yyyy')}</p>
+                    </td>
+                  </tr>
+                </tbody>
+              </table>
             </div>
 
+            {/* Seção I - Locomoções com design sofisticado */}
             <div className="mb-6">
-              <h3 className="text-xs font-bold border-b border-black mb-3 pb-1 uppercase">I - LOCOMOÇÕES NO PERÍODO</h3>
+              <div className="bg-gradient-to-r from-blue-600 to-blue-700 text-white px-4 py-2 mb-0 print:bg-gray-800 print:text-white">
+                <h3 className="text-[11pt] font-bold uppercase tracking-wide">I - LOCOMOÇÕES NO PERÍODO</h3>
+              </div>
               {locomocoesInMonth.length > 0 ? (
-                <table className="w-full border-collapse border border-black text-[10px]">
+                <table className="w-full border-collapse border-2 border-black text-[10pt]">
                   <thead>
-                    <tr className="bg-gray-100">
-                      <th className="border border-black p-1.5 text-left w-24">Data</th>
-                      <th className="border border-black p-1.5 text-left">Motivo</th>
-                      <th className="border border-black p-1.5 text-center w-20">Saída</th>
-                      <th className="border border-black p-1.5 text-center w-20">Retorno</th>
+                    <tr className="bg-gray-200 print:bg-gray-100">
+                      <th className="border-2 border-black p-2 text-left w-28 font-bold">DATA</th>
+                      <th className="border-2 border-black p-2 text-left font-bold">MOTIVO</th>
+                      <th className="border-2 border-black p-2 text-center w-24 font-bold">SAÍDA</th>
+                      <th className="border-2 border-black p-2 text-center w-24 font-bold">RETORNO</th>
                     </tr>
                   </thead>
                   <tbody>
                     {locomocoesInMonth.map((m: Locomocao, i: number) => (
-                      <tr key={i}>
-                        <td className="border border-black p-1.5">
+                      <tr key={i} className={i % 2 === 0 ? 'bg-white' : 'bg-gray-50'}>
+                        <td className="border-2 border-black p-2 font-semibold">
                           {new Date(m.data + 'T00:00:00').toLocaleDateString('pt-BR')}
                         </td>
-                        <td className="border border-black p-1.5">{m.motivo}</td>
-                        <td className="border border-black p-1.5 text-center">{m.saida}</td>
-                        <td className="border border-black p-1.5 text-center">{m.retorno}</td>
+                        <td className="border-2 border-black p-2 font-medium">{m.motivo}</td>
+                        <td className="border-2 border-black p-2 text-center font-semibold">{m.saida}</td>
+                        <td className="border-2 border-black p-2 text-center font-semibold">{m.retorno}</td>
                       </tr>
                     ))}
                   </tbody>
                 </table>
               ) : (
-                <p className="text-gray-500 italic text-[10px]">Nenhuma locomoção registrada neste mês.</p>
+                <div className="border-2 border-black p-4 text-center italic bg-gray-50">
+                  <p className="text-[10pt]">Nenhuma locomoção registrada neste mês.</p>
+                </div>
               )}
             </div>
 
+            {/* Seção II - Orientações Técnicas com design sofisticado */}
             <div className="mb-8">
-              <h3 className="text-xs font-bold border-b border-black mb-3 pb-1 uppercase">II - ORIENTAÇÕES TÉCNICAS NO PERÍODO</h3>
+              <div className="bg-gradient-to-r from-purple-600 to-purple-700 text-white px-4 py-2 mb-0 print:bg-gray-800 print:text-white">
+                <h3 className="text-[11pt] font-bold uppercase tracking-wide">II - ORIENTAÇÕES TÉCNICAS NO PERÍODO</h3>
+              </div>
               {orientacoesInMonth.length > 0 ? (
-                <table className="w-full border-collapse border border-black text-[10px]">
+                <table className="w-full border-collapse border-2 border-black text-[10pt]">
                   <thead>
-                    <tr className="bg-gray-100">
-                      <th className="border border-black p-1.5 text-left w-24">Data</th>
-                      <th className="border border-black p-1.5 text-left">Assunto</th>
-                      <th className="border border-black p-1.5 text-left">Local</th>
-                      <th className="border border-black p-1.5 text-center">Horário</th>
-                      <th className="border border-black p-1.5 text-center">DOE</th>
-                      <th className="border border-black p-1.5 text-center">Diária</th>
+                    <tr className="bg-gray-200 print:bg-gray-100">
+                      <th className="border-2 border-black p-2 text-left w-24 font-bold">DATA</th>
+                      <th className="border-2 border-black p-2 text-left font-bold">ASSUNTO</th>
+                      <th className="border-2 border-black p-2 text-left font-bold">LOCAL</th>
+                      <th className="border-2 border-black p-2 text-center w-28 font-bold">HORÁRIO</th>
+                      <th className="border-2 border-black p-2 text-center w-24 font-bold">DOE</th>
+                      <th className="border-2 border-black p-2 text-center w-16 font-bold">DIÁRIA</th>
                     </tr>
                   </thead>
                   <tbody>
                     {orientacoesInMonth.map((g: OrientacaoTecnica, i: number) => (
-                      <tr key={i}>
-                        <td className="border border-black p-1.5">
+                      <tr key={i} className={i % 2 === 0 ? 'bg-white' : 'bg-gray-50'}>
+                        <td className="border-2 border-black p-2 font-semibold">
                           {new Date(g.data + 'T00:00:00').toLocaleDateString('pt-BR')}
                         </td>
-                        <td className="border border-black p-1.5">{g.assunto}</td>
-                        <td className="border border-black p-1.5">{g.local}</td>
-                        <td className="border border-black p-1.5 text-center">{g.inicio} - {g.fim}</td>
-                        <td className="border border-black p-1.5 text-center">
+                        <td className="border-2 border-black p-2 font-medium">{g.assunto}</td>
+                        <td className="border-2 border-black p-2 font-medium">{g.local}</td>
+                        <td className="border-2 border-black p-2 text-center font-semibold">{g.inicio} - {g.fim}</td>
+                        <td className="border-2 border-black p-2 text-center font-semibold">
                           {g.doeConvocacao ? new Date(g.doeConvocacao + 'T00:00:00').toLocaleDateString('pt-BR') : '-'}
                         </td>
-                        <td className="border border-black p-1.5 text-center">{g.pagoDiaria ? 'Sim' : 'Não'}</td>
+                        <td className="border-2 border-black p-2 text-center font-semibold">
+                          {g.pagoDiaria ? 'SIM' : 'NÃO'}
+                        </td>
                       </tr>
                     ))}
                   </tbody>
                 </table>
               ) : (
-                <p className="text-gray-500 italic text-[10px]">Nenhuma orientação técnica registrada neste mês.</p>
+                <div className="border-2 border-black p-4 text-center italic bg-gray-50">
+                  <p className="text-[10pt]">Nenhuma orientação técnica registrada neste mês.</p>
+                </div>
               )}
             </div>
 
-            <div className="mt-20 grid grid-cols-2 gap-12 print:block hidden">
-              <div className="w-full max-w-[280px] border-t border-black text-center pt-2 mx-auto">
-                <p className="text-[10px] font-bold uppercase">{server.nome}</p>
-                <p className="text-[9px]">Assinatura do Servidor</p>
+            {/* Seção III - Ausências no Período */}
+            <div className="mb-8">
+              <div className="bg-gradient-to-r from-red-600 to-red-700 text-white px-4 py-2 mb-0 print:bg-gray-800 print:text-white">
+                <h3 className="text-[11pt] font-bold uppercase tracking-wide">III - AUSÊNCIAS NO PERÍODO</h3>
               </div>
-              <div className="w-full max-w-[280px] border-t border-black text-center pt-10 mx-auto mt-32">
-                <p className="text-[10px] font-bold uppercase">{school?.diretor || 'Direção Escolar'}</p>
-                <p className="text-[9px]">RG: {school?.diretorRG || '_______-___'}</p>
-                <p className="text-[9px]">Assinatura e Carimbo</p>
-              </div>
+              {ausenciasInMonth.length > 0 ? (
+                <table className="w-full border-collapse border-2 border-black text-[10pt]">
+                  <thead>
+                    <tr className="bg-gray-200 print:bg-gray-100">
+                      <th className="border-2 border-black p-2 text-left w-28 font-bold">DATA</th>
+                      <th className="border-2 border-black p-2 text-left font-bold">TIPO</th>
+                      <th className="border-2 border-black p-2 text-left font-bold">DESCRIÇÃO</th>
+                    </tr>
+                  </thead>
+                  <tbody>
+                    {ausenciasInMonth.map((a, i) => (
+                      <tr key={i} className={i % 2 === 0 ? 'bg-white' : 'bg-gray-50'}>
+                        <td className="border-2 border-black p-2 font-semibold">
+                          {new Date(a.data + 'T00:00:00').toLocaleDateString('pt-BR')}
+                        </td>
+                        <td className="border-2 border-black p-2 font-semibold">
+                          {a.tipo === 'Total' ? 'TOTAL' : 'PARCIAL'}
+                        </td>
+                        <td className="border-2 border-black p-2 font-medium">{a.descricao}</td>
+                      </tr>
+                    ))}
+                  </tbody>
+                </table>
+              ) : (
+                <div className="border-2 border-black p-4 text-center italic bg-gray-50">
+                  <p className="text-[10pt]">Nenhuma ausência registrada neste mês.</p>
+                </div>
+              )}
             </div>
+
           </div>
         ) : (
           <div className="flex flex-col items-center justify-center h-64 border-2 border-dashed border-gray-200 rounded-lg text-gray-400">

@@ -114,6 +114,9 @@ export const Servers = ({
       nome: formData.get('nome') as string,
       cpf: formData.get('cpf') as string,
       rgcin: formData.get('rgcin') as string,
+      di: formData.get('di') as string,
+      rs: formData.get('rs') as string,
+      pv_atual: formData.get('pv_atual') as string,
       datanascimento: formData.get('datanascimento') as string,
       telefone: formData.get('telefone') as string,
       email: formData.get('email') as string,
@@ -315,6 +318,18 @@ export const Servers = ({
               <Input name="rgcin" defaultValue={editingServer?.rgcin} />
             </div>
             <div className="space-y-2">
+              <label className="text-sm font-medium text-slate-700">DI</label>
+              <Input name="di" type="number" defaultValue={editingServer?.di} />
+            </div>
+            <div className="space-y-2">
+              <label className="text-sm font-medium text-slate-700">RS</label>
+              <Input name="rs" defaultValue={editingServer?.rs} />
+            </div>
+            <div className="space-y-2">
+              <label className="text-sm font-medium text-slate-700">PV Atual</label>
+              <Input name="pv_atual" defaultValue={editingServer?.pv_atual} />
+            </div>
+            <div className="space-y-2">
               <label className="text-sm font-medium text-slate-700">Data de Nascimento</label>
               <Input name="datanascimento" type="date" defaultValue={editingServer?.datanascimento} />
             </div>
@@ -410,6 +425,18 @@ export const Servers = ({
               <div>
                 <p className="text-xs text-slate-500 uppercase">RGCIN</p>
                 <p className="text-sm font-medium text-slate-900">{viewingServer.rgcin || '-'}</p>
+              </div>
+              <div>
+                <p className="text-xs text-slate-500 uppercase">DI</p>
+                <p className="text-sm font-medium text-slate-900">{viewingServer.di || '-'}</p>
+              </div>
+              <div>
+                <p className="text-xs text-slate-500 uppercase">RS</p>
+                <p className="text-sm font-medium text-slate-900">{viewingServer.rs || '-'}</p>
+              </div>
+              <div>
+                <p className="text-xs text-slate-500 uppercase">PV Atual</p>
+                <p className="text-sm font-medium text-slate-900">{viewingServer.pv_atual || '-'}</p>
               </div>
               <div>
                 <p className="text-xs text-slate-500 uppercase">Data de Nascimento</p>

@@ -62,7 +62,9 @@ export const Benefits: React.FC<BenefitsProps> = ({ servers, user, onUpdateServe
   const [editingATSId, setEditingATSId] = useState<string | null>(null);
   const [showSextaParteForm, setShowSextaParteForm] = useState(false);
   const [showAddLicenca, setShowAddLicenca] = useState(false);
+  const [editingLicencaId, setEditingLicencaId] = useState<string | null>(null);
   const [showAddUsage, setShowAddUsage] = useState(false);
+  const [editingUsageId, setEditingUsageId] = useState<string | null>(null);
   const [showAddEvolucao, setShowAddEvolucao] = useState(false);
   const [editingEvolucaoId, setEditingEvolucaoId] = useState<string | null>(null);
   
@@ -238,13 +240,24 @@ export const Benefits: React.FC<BenefitsProps> = ({ servers, user, onUpdateServe
 
   const handleAddLicenca = () => {
     if (!selectedServer) return;
-    const licencaRecord: LicencaPremio = {
-      ...newLicenca,
-      id: Math.random().toString(36).substr(2, 9)
-    };
-    onUpdateServer(selectedServer.id, {
-      licencasPremio: [...(selectedServer.licencasPremio || []), licencaRecord]
-    });
+    
+    if (editingLicencaId) {
+      onUpdateServer(selectedServer.id, {
+        licencasPremio: (selectedServer.licencasPremio || []).map(l =>
+          l.id === editingLicencaId ? { ...newLicenca, id: l.id } : l
+        )
+      });
+      setEditingLicencaId(null);
+    } else {
+      const licencaRecord: LicencaPremio = {
+        ...newLicenca,
+        id: Math.random().toString(36).substr(2, 9)
+      };
+      onUpdateServer(selectedServer.id, {
+        licencasPremio: [...(selectedServer.licencasPremio || []), licencaRecord]
+      });
+    }
+    
     setShowAddLicenca(false);
     setNewLicenca({
       numeroCertidao: '',
@@ -264,21 +277,49 @@ export const Benefits: React.FC<BenefitsProps> = ({ servers, user, onUpdateServe
     });
   };
 
+  const handleEditLicenca = (licenca: LicencaPremio) => {
+    setNewLicenca({
+      numeroCertidao: licenca.numeroCertidao,
+      periodoAquisitivo: licenca.periodoAquisitivo,
+      saldoInicial: licenca.saldoInicial,
+      dataDOE: licenca.dataDOE,
+      ultimaCertidao: licenca.ultimaCertidao || false,
+      inicioVigenciaProxima: licenca.inicioVigenciaProxima || ''
+    });
+    setEditingLicencaId(licenca.id);
+    setShowAddLicenca(true);
+  };
+
   const handleAddUsage = () => {
     if (!selectedServer) return;
-    const usageRecord: LicencaPremioUsage = {
-      ...newUsage,
-      id: Math.random().toString(36).substr(2, 9),
-      quantidadeDias: newUsage.tipo === 'Pecúnia' ? 30 : Number(newUsage.quantidadeDias)
-    };
-    const currentBalance = calculateBalance(usageRecord.certidaoId, selectedServer);
-    if (usageRecord.quantidadeDias > currentBalance) {
-      alert(`Saldo insuficiente! Saldo atual: ${currentBalance} dias.`);
-      return;
+    
+    if (editingUsageId) {
+      onUpdateServer(selectedServer.id, {
+        licencasPremioUsage: (selectedServer.licencasPremioUsage || []).map(u =>
+          u.id === editingUsageId ? { 
+            ...newUsage, 
+            id: u.id,
+            quantidadeDias: newUsage.tipo === 'Pecúnia' ? 30 : Number(newUsage.quantidadeDias)
+          } : u
+        )
+      });
+      setEditingUsageId(null);
+    } else {
+      const usageRecord: LicencaPremioUsage = {
+        ...newUsage,
+        id: Math.random().toString(36).substr(2, 9),
+        quantidadeDias: newUsage.tipo === 'Pecúnia' ? 30 : Number(newUsage.quantidadeDias)
+      };
+      const currentBalance = calculateBalance(usageRecord.certidaoId, selectedServer);
+      if (usageRecord.quantidadeDias > currentBalance) {
+        alert(`Saldo insuficiente! Saldo atual: ${currentBalance} dias.`);
+        return;
+      }
+      onUpdateServer(selectedServer.id, {
+        licencasPremioUsage: [...(selectedServer.licencasPremioUsage || []), usageRecord]
+      });
     }
-    onUpdateServer(selectedServer.id, {
-      licencasPremioUsage: [...(selectedServer.licencasPremioUsage || []), usageRecord]
-    });
+    
     setShowAddUsage(false);
     setNewUsage({
       certidaoId: '',
@@ -289,6 +330,20 @@ export const Benefits: React.FC<BenefitsProps> = ({ servers, user, onUpdateServe
       dataAutorizacaoDOE: '',
       anoPecunia: ''
     });
+  };
+
+  const handleEditUsage = (usage: LicencaPremioUsage) => {
+    setNewUsage({
+      certidaoId: usage.certidaoId,
+      tipo: usage.tipo,
+      quantidadeDias: usage.quantidadeDias,
+      dataIncio: usage.dataIncio || '',
+      dataFim: usage.dataFim || '',
+      dataAutorizacaoDOE: usage.dataAutorizacaoDOE || '',
+      anoPecunia: usage.anoPecunia || ''
+    });
+    setEditingUsageId(usage.id);
+    setShowAddUsage(true);
   };
 
   const handleDeleteUsage = (id: string) => {
@@ -610,7 +665,7 @@ export const Benefits: React.FC<BenefitsProps> = ({ servers, user, onUpdateServe
                       </div>
                     )}
 
-                    <Button onClick={handleAddLicenca} className="col-span-2 bg-emerald-600">Salvar Certidão</Button>
+                      <Button onClick={handleAddLicenca} className="col-span-2 bg-emerald-600">{editingLicencaId ? 'Atualizar Certidão' : 'Salvar Certidão'}</Button>
                   </div>
                 )}
                 <div className="space-y-3">
@@ -636,7 +691,10 @@ export const Benefits: React.FC<BenefitsProps> = ({ servers, user, onUpdateServe
                                 {balance} DIAS
                               </Badge>
                             </div>
-                            <button onClick={() => handleDeleteLicenca(l.id)} className="text-gray-300 hover:text-red-500"><Trash2 className="w-4 h-4" /></button>
+                            <div className="flex gap-2">
+                              <button onClick={() => handleEditLicenca(l)} className="text-blue-500 hover:text-blue-700"><FileText className="w-4 h-4" /></button>
+                              <button onClick={() => handleDeleteLicenca(l.id)} className="text-gray-300 hover:text-red-500"><Trash2 className="w-4 h-4" /></button>
+                            </div>
                           </div>
                         </div>
                       </div>
@@ -705,7 +763,7 @@ export const Benefits: React.FC<BenefitsProps> = ({ servers, user, onUpdateServe
                         </div>
                       </div>
                     )}
-                    <Button onClick={handleAddUsage} className="w-full bg-orange-600">Registrar Utilização</Button>
+                    <Button onClick={handleAddUsage} className="w-full bg-orange-600">{editingUsageId ? 'Atualizar Utilização' : 'Registrar Utilização'}</Button>
                   </div>
                 )}
                 <div className="space-y-2">
@@ -725,7 +783,10 @@ export const Benefits: React.FC<BenefitsProps> = ({ servers, user, onUpdateServe
                             </p>
                           </div>
                         </div>
-                        <button onClick={() => handleDeleteUsage(u.id)} className="text-gray-300 hover:text-red-500"><Trash2 className="w-4 h-4" /></button>
+                        <div className="flex gap-2">
+                          <button onClick={() => handleEditUsage(u)} className="text-blue-500 hover:text-blue-700"><FileText className="w-4 h-4" /></button>
+                          <button onClick={() => handleDeleteUsage(u.id)} className="text-gray-300 hover:text-red-500"><Trash2 className="w-4 h-4" /></button>
+                        </div>
                       </div>
                     );
                   })}

@@ -71,6 +71,15 @@ export interface OrientacaoTecnica {
   pagoDiaria: boolean;
 }
 
+export type AusenciaTipo = 'Parcial' | 'Total';
+
+export interface Ausencia {
+  id: string;
+  data: string;
+  tipo: AusenciaTipo;
+  descricao: string;
+}
+
 export interface SchoolInfo {
   nome: string;
   cie: string;
@@ -93,6 +102,9 @@ export interface Server {
   nome: string;
   cpf: string;
   rgcin: string;
+  di: string;
+  rs: string;
+  pv_atual: string;
   datanascimento: string;
   telefone: string;
   email: string;
@@ -111,6 +123,7 @@ export interface Server {
   evolucoesFuncionais?: EvolucaoFuncional[];
   locomocoes?: Locomocao[];
   orientacoesTecnicas?: OrientacaoTecnica[];
+  ausencias?: Ausencia[];
 }
 
 export interface DashboardStats {

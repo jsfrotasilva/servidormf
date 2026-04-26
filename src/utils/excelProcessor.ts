@@ -44,7 +44,7 @@ const formatDateForInput = (value: any): string => {
 
 export const downloadExcelTemplate = () => {
   const headers = [
-    'nome', 'cpf', 'rgcin', 'datanascimento', 'telefone', 'email', 'endereco',
+    'nome', 'cpf', 'rgcin', 'di', 'rs', 'pvatual', 'datanascimento', 'telefone', 'email', 'endereco',
     'cargo', 'disciplina', 'disciplinanaoespecifica', 'categoria', 
     'datadecontrato', 'datafimsontrato', 'ativo'
   ];
@@ -54,6 +54,9 @@ export const downloadExcelTemplate = () => {
       nome: 'João Silva',
       cpf: '123.456.789-00',
       rgcin: '1234567-8',
+      di: '1',
+      rs: '001',
+      pvatual: '01',
       datanascimento: '1980-01-01',
       telefone: '(11) 98888-7777',
       email: 'joao@email.com',
@@ -105,6 +108,9 @@ export const processExcelFile = (file: File): Promise<Server[]> => {
             nome: String(normalizedRow.nome || ''),
             cpf: String(normalizedRow.cpf || ''),
             rgcin: String(normalizedRow.rgcin || ''),
+            di: String(normalizedRow.di || ''),
+            rs: String(normalizedRow.rs || ''),
+            pv_atual: String(normalizedRow.pvatual || normalizedRow.pv_atual || ''),
             datanascimento: formatDateForInput(normalizedRow.datanascimento),
             telefone: String(normalizedRow.telefone || ''),
             email: String(normalizedRow.email || ''),

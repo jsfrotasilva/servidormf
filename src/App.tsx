@@ -10,6 +10,7 @@ import { Guidance } from './pages/Guidance';
 import { Settings } from './pages/Settings';
 import { Birthdays } from './pages/Birthdays';
 import Reports from './pages/Reports';
+import { Ausencias } from './pages/Ausencias';
 import { Server, SchoolInfo, User } from './types/server';
 
 const initialSchoolInfo: SchoolInfo = {
@@ -57,6 +58,9 @@ function App() {
           nome: s.nome,
           cpf: s.cpf,
           rgcin: s.rgcin,
+          di: s.di || '',
+          rs: s.rs || '',
+          pv_atual: s.pv_atual || '',
           datanascimento: s.datanascimento,
           telefone: s.telefone,
           email: s.email,
@@ -128,6 +132,9 @@ function App() {
       nome: server.nome,
       cpf: server.cpf,
       rgcin: server.rgcin,
+      di: server.di,
+      rs: server.rs,
+      pv_atual: server.pv_atual,
       datanascimento: formatDate(server.datanascimento),
       telefone: server.telefone,
       email: server.email,
@@ -272,6 +279,7 @@ function App() {
       case 'guidance': return <Guidance servers={servers} onUpdateServer={handleUpdateServer} />;
       case 'birthdays': return <Birthdays servers={servers} />;
       case 'reports': return <Reports servers={servers} school={schoolInfo} />;
+      case 'ausencias': return <Ausencias servers={servers} user={defaultAdminUser} onUpdateServer={handleUpdateServer} />;
       case 'settings': return <Settings schoolInfo={schoolInfo} onUpdateSchool={handleUpdateSchool} />;
       default: return <Dashboard servers={servers} />;
     }

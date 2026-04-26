@@ -4,6 +4,7 @@ import {
   LayoutDashboard, 
   Users, 
   Settings, 
+  LogOut,
   Menu, 
   X,
   Bell,
@@ -13,7 +14,8 @@ import {
   Truck,
   BookOpen,
   Cake,
-  FileText
+  FileText,
+  Calendar
 } from 'lucide-react';
 import { cn } from './UI';
 import { getAvatarUrl } from '../utils/formatters';
@@ -110,6 +112,12 @@ export const Layout = ({ children, activeTab, setActiveTab, user }: {
             label="Relatórios" 
             active={activeTab === 'reports'} 
             onClick={() => setActiveTab('reports')}
+          />
+          <SidebarItem 
+            icon={Calendar} 
+            label="Ausências" 
+            active={activeTab === 'ausencias'} 
+            onClick={() => setActiveTab('ausencias')}
           />
           <SidebarItem 
             icon={Settings} 
